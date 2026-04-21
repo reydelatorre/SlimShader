@@ -13,6 +13,28 @@
     --color-border: #2e2e2e;
 }
 
+@keyframes logo-sweep {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+.logo-gradient {
+    background: linear-gradient(
+        90deg,
+        #ff2d78 0%,
+        #bf5af2 20%,
+        #01cdfe 40%,
+        #05ffa1 60%,
+        #bf5af2 80%,
+        #ff2d78 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: logo-sweep 4s linear infinite;
+}
+
 * {
     box-sizing: border-box;
 }

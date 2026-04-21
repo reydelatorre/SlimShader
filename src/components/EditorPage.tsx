@@ -14,6 +14,7 @@ export function EditorPage() {
     const navigate = useNavigate();
     const shader = useShaderStore((s) => s.shaders.find((sh) => sh.id === shaderId));
     const updateShader = useShaderStore((s) => s.updateShader);
+    const setPublished = useShaderStore((s) => s.setPublished);
     const addUniform = useShaderStore((s) => s.addUniform);
     const updateUniform = useShaderStore((s) => s.updateUniform);
     const removeUniform = useShaderStore((s) => s.removeUniform);
@@ -102,6 +103,17 @@ export function EditorPage() {
                 )}
 
                 <div className="flex-1" />
+
+                <button
+                    onClick={() => setPublished(shaderId, !shader.published)}
+                    className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                        shader.published
+                            ? "border-accent-bright text-accent-bright hover:bg-accent-bright hover:text-black"
+                            : "border-border text-surface-4 hover:border-white hover:text-white"
+                    }`}
+                >
+                    {shader.published ? "published" : "publish"}
+                </button>
 
                 {error && (
                     <span className="text-red-400 text-[10px] max-w-xs truncate" title={error.message}>

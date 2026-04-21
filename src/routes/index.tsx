@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useShaderStore } from "../lib/shader-store";
 import { SHADER_TOYS } from "../lib/shader-toys";
 
@@ -35,6 +35,12 @@ function HomePage() {
                     </span>
                     <span className="text-surface-4 text-xs">/ GLSL editor + Love2D exporter</span>
                 </div>
+                <Link
+                    to="/gallery"
+                    className="text-surface-4 text-xs hover:text-white transition-colors"
+                >
+                    gallery →
+                </Link>
             </header>
 
             <main className="flex-1 flex flex-col items-center gap-12 px-6 py-12">

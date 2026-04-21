@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@supabase/supabase-js": "^2.104.0",
     "@tanstack/react-router": "^1.168.23",
     "@tanstack/router-plugin": "^1.167.22",
     "file-saver": "^2.0.5",
