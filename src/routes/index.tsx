@@ -40,7 +40,7 @@ function HomePage() {
                         to="/gallery"
                         className="text-surface-4 text-xs hover:text-white transition-colors"
                     >
-                        gallery →
+                        gallery
                     </Link>
                     <button
                         onClick={() => supabase.auth.signOut()}

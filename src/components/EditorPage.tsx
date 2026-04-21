@@ -119,9 +119,15 @@ export function EditorPage() {
                     </span>
                 )}
                 {!error && <span className="text-green-500 text-[10px]">● compiled</span>}
+                <Link
+                    to="/gallery"
+                    className="text-surface-4 text-[10px] hover:text-white transition-colors"
+                >
+                    gallery
+                </Link>
                 <button
                     onClick={() => supabase.auth.signOut()}
-                    className="text-surface-4 text-[10px] hover:text-white transition-colors ml-1"
+                    className="text-surface-4 text-[10px] hover:text-white transition-colors"
                 >
                     sign out
                 </button>

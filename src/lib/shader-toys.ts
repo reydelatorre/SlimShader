@@ -301,58 +301,45 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // ─────────────────────────────────────────────
     {
         name: "Bayer Dither",
-        description: "4x4 ordered dithering on an animated gradient",
+        description: "Ordered dithering — variable matrix size and pixel dimensions",
         color: "#eab308",
         uniforms: [
-            { name: "uLevels", type: "float", value: 4.0, min: 2.0, max: 16.0, step: 1.0 },
-            { name: "uSpeed", type: "float", value: 0.3, min: 0.0, max: 1.0, step: 0.01 },
-            { name: "uFreqX", type: "float", value: 4.0, min: 0.5, max: 12.0, step: 0.1 },
-            { name: "uFreqY", type: "float", value: 3.0, min: 0.5, max: 12.0, step: 0.1 },
+            { name: "uMatrixBits", type: "float", value: 2.0, min: 1.0, max: 3.0, step: 1.0 },
+            { name: "uPixelSize",  type: "float", value: 2.0, min: 1.0, max: 16.0, step: 1.0 },
+            { name: "uLevels",     type: "float", value: 4.0, min: 2.0, max: 16.0, step: 1.0 },
+            { name: "uSpeed",      type: "float", value: 0.3, min: 0.0, max: 1.0,  step: 0.01 },
+            { name: "uFreqX",      type: "float", value: 4.0, min: 0.5, max: 12.0, step: 0.1 },
+            { name: "uFreqY",      type: "float", value: 3.0, min: 0.5, max: 12.0, step: 0.1 },
         ],
-        source: `// 4x4 Bayer threshold in float arithmetic (GLSL ES 1.00 compatible)
-float bayerThreshold(vec2 p) {
-    float x  = mod(p.x, 4.0);
-    float y  = mod(p.y, 4.0);
-    float x0 = mod(x, 2.0);
-    float x1 = floor(x / 2.0);
-    float y0 = mod(y, 2.0);
-    float y1 = floor(y / 2.0);
-    float v  = 8.0 * mod(x0 + y0, 2.0)
-             + 4.0 * y0
-             + 2.0 * mod(x1 + y1, 2.0)
-             + y1;
-    return v / 16.0;
+        source: `// Bayer threshold for matrices up to 8x8 (uMatrixBits: 1=2x2, 2=4x4, 3=8x8)
+// Accumulates XOR-based bit levels in float arithmetic (GLSL ES 1.00)
+float bayer(vec2 p) {
+    float N = pow(2.0, uMatrixBits);
+    float x = mod(p.x, N), y = mod(p.y, N);
+    float x0 = mod(x, 2.0),           y0 = mod(y, 2.0);
+    float x1 = mod(floor(x * 0.5), 2.0), y1 = mod(floor(y * 0.5), 2.0);
+    float x2 = mod(floor(x * 0.25), 2.0), y2 = mod(floor(y * 0.25), 2.0);
+    float v = (2.0 * mod(x0 + y0, 2.0) + y0)
+            +  4.0 * step(2.0, uMatrixBits) * (2.0 * mod(x1 + y1, 2.0) + y1)
+            + 16.0 * step(3.0, uMatrixBits) * (2.0 * mod(x2 + y2, 2.0) + y2);
+    return v / (N * N);
 }
 
 vec3 palette(float t) {
-    vec3 a = vec3(0.05, 0.05, 0.3);
-    vec3 b = vec3(0.8,  0.1,  0.6);
-    vec3 c = vec3(0.9,  0.7,  0.1);
-    if (t < 0.5) return mix(a, b, t * 2.0);
-    return mix(b, c, (t - 0.5) * 2.0);
+    vec3 a = vec3(0.05, 0.05, 0.3), b = vec3(0.8, 0.1, 0.6), c = vec3(0.9, 0.7, 0.1);
+    return t < 0.5 ? mix(a, b, t * 2.0) : mix(b, c, t * 2.0 - 1.0);
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-    float t = iTime * uSpeed;
-    vec2 uv = fragCoord / iResolution.xy;
-
-    float wave = sin(uv.x * uFreqX + t) * 0.25
-               + sin(uv.y * uFreqY - t * 0.8) * 0.25
-               + 0.5;
+    vec2 uv = floor(fragCoord / uPixelSize) * uPixelSize / iResolution.xy;
+    float wave = sin(uv.x * uFreqX + iTime * uSpeed) * 0.25
+               + sin(uv.y * uFreqY - iTime * uSpeed * 0.8) * 0.25 + 0.5;
     vec3 src = palette(wave);
-
-    float thresh = bayerThreshold(fragCoord);
-    float step_  = 1.0 / uLevels;
-    vec3  lo     = floor(src * uLevels) / uLevels;
-    vec3  hi     = lo + step_;
-    vec3  frac_  = (src - lo) * uLevels;
-
-    vec3 col;
-    col.r = frac_.r > thresh ? hi.r : lo.r;
-    col.g = frac_.g > thresh ? hi.g : lo.g;
-    col.b = frac_.b > thresh ? hi.b : lo.b;
-
-    fragColor = vec4(col, 1.0);
+    float t = bayer(fragCoord), s = 1.0 / uLevels;
+    vec3 lo = floor(src * uLevels) / uLevels, f = (src - lo) * uLevels;
+    fragColor = vec4(f.r > t ? lo.r + s : lo.r,
+                     f.g > t ? lo.g + s : lo.g,
+                     f.b > t ? lo.b + s : lo.b, 1.0);
 }`,
     },
 ];
