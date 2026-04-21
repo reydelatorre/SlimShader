@@ -5,6 +5,7 @@ import { useShaderStore } from "../lib/shader-store";
 import type { ShaderEntry } from "../lib/shader-store";
 import { supabase } from "../lib/supabase";
 import { Logo } from "../components/Logo";
+import { ShaderThumb } from "../components/ShaderThumb";
 
 export const Route = createFileRoute("/gallery")({
     component: GalleryPage,
@@ -80,18 +81,26 @@ function GalleryPage() {
                         {shaders.map((s) => (
                             <div
                                 key={s.id}
-                                className="group bg-surface-1 border border-border rounded-lg p-4 flex flex-col gap-3"
+                                className="group bg-surface-1 border border-border rounded-lg overflow-hidden flex flex-col"
                             >
-                                <p className="text-white text-xs font-medium">{s.name}</p>
-                                <p className="text-surface-4 text-[10px]">
-                                    {new Date(s.updatedAt).toLocaleDateString()}
-                                </p>
-                                <button
-                                    onClick={() => handleFork(s)}
-                                    className="mt-auto text-[10px] px-3 py-1.5 border border-border rounded text-surface-4 hover:border-accent-bright hover:text-accent-bright transition-colors"
-                                >
-                                    fork →
-                                </button>
+                                <ShaderThumb
+                                    fragmentSource={s.fragmentSource}
+                                    uniforms={s.uniforms}
+                                />
+                                <div className="p-3 flex flex-col gap-2">
+                                    <p className="text-white text-xs font-medium">{s.name}</p>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-surface-4 text-[10px]">
+                                            {new Date(s.updatedAt).toLocaleDateString()}
+                                        </span>
+                                        <button
+                                            onClick={() => handleFork(s)}
+                                            className="text-[10px] px-2 py-1 border border-border rounded text-surface-4 hover:border-accent-bright hover:text-accent-bright transition-colors"
+                                        >
+                                            fork →
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
