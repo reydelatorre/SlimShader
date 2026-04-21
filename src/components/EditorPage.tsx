@@ -3,13 +3,14 @@ import { useParams, useNavigate, Link } from "@tanstack/react-router";
 import { useShaderStore } from "../lib/shader-store";
 import { supabase } from "../lib/supabase";
 import { Logo } from "./Logo";
-import type { RendererError } from "../lib/webgl-renderer";
+import type { RendererError, PassInfo } from "../lib/webgl-renderer";
 import { ShaderPreview } from "./ShaderPreview";
 import { ShaderEditor } from "./ShaderEditor";
 import { UniformsPanel } from "./UniformsPanel";
+import { PassesPanel } from "./PassesPanel";
 import { ExportPanel } from "./ExportPanel";
 
-type RightPanel = "uniforms" | "export";
+type RightPanel = "uniforms" | "passes" | "export";
 
 export function EditorPage() {
     const { shaderId } = useParams({ from: "/editor/$shaderId" });
@@ -17,9 +18,13 @@ export function EditorPage() {
     const shader = useShaderStore((s) => s.shaders.find((sh) => sh.id === shaderId));
     const updateShader = useShaderStore((s) => s.updateShader);
     const setPublished = useShaderStore((s) => s.setPublished);
+    const allShaders = useShaderStore((s) => s.shaders);
     const addUniform = useShaderStore((s) => s.addUniform);
     const updateUniform = useShaderStore((s) => s.updateUniform);
     const removeUniform = useShaderStore((s) => s.removeUniform);
+    const addPass = useShaderStore((s) => s.addPass);
+    const removePass = useShaderStore((s) => s.removePass);
+    const reorderPass = useShaderStore((s) => s.reorderPass);
 
     const [localSource, setLocalSource] = useState(shader?.fragmentSource ?? "");
     const [error, setError] = useState<RendererError | null>(null);
@@ -67,6 +72,13 @@ export function EditorPage() {
     if (!shader) return null;
 
     const uniforms = shader.uniforms;
+
+    // Build ordered PassInfo list: resolved pre-passes + current shader last
+    const passPasses: PassInfo[] = shader.passes
+        .map((id) => allShaders.find((s) => s.id === id))
+        .filter(Boolean)
+        .map((s) => ({ source: s!.fragmentSource, uniforms: s!.uniforms }));
+    const allPasses: PassInfo[] = [...passPasses, { source: localSource, uniforms }];
 
     return (
         <div className="h-screen flex flex-col bg-surface-0 overflow-hidden">
@@ -149,11 +161,7 @@ export function EditorPage() {
 
                 {/* Preview */}
                 <div className="w-[40%] flex-shrink-0 border-r border-border flex flex-col">
-                    <ShaderPreview
-                        fragmentSource={localSource}
-                        uniforms={uniforms}
-                        onError={handleError}
-                    />
+                    <ShaderPreview passes={allPasses} onError={handleError} />
                     {error && (
                         <div className="flex-shrink-0 bg-surface-2 border-t border-red-900 max-h-28 overflow-y-auto">
                             <pre className="text-red-400 text-[10px] p-2 whitespace-pre-wrap leading-relaxed">
@@ -164,10 +172,10 @@ export function EditorPage() {
                 </div>
 
                 {/* Right panel */}
-                <div className="w-64 flex-shrink-0 flex flex-col">
+                <div className="w-80 flex-shrink-0 flex flex-col">
                     {/* Panel tabs */}
                     <div className="flex border-b border-border flex-shrink-0">
-                        {(["uniforms", "export"] as RightPanel[]).map((p) => (
+                        {(["uniforms", "passes", "export"] as RightPanel[]).map((p) => (
                             <button
                                 key={p}
                                 onClick={() => setRightPanel(p)}
@@ -190,6 +198,16 @@ export function EditorPage() {
                                 onUpdate={(name, patch) => updateUniform(shaderId, name, patch)}
                                 onRemove={(name) => removeUniform(shaderId, name)}
                                 onValueChange={handleUniformValueChange}
+                            />
+                        )}
+                        {rightPanel === "passes" && (
+                            <PassesPanel
+                                shaderId={shaderId}
+                                passes={shader.passes}
+                                onAdd={(passId) => addPass(shaderId, passId)}
+                                onRemove={(i) => removePass(shaderId, i)}
+                                onMoveUp={(i) => reorderPass(shaderId, i, i - 1)}
+                                onMoveDown={(i) => reorderPass(shaderId, i, i + 1)}
                             />
                         )}
                         {rightPanel === "export" && <ExportPanel shader={shader} />}

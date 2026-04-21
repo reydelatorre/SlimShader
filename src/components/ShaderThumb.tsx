@@ -19,7 +19,7 @@ export function ShaderThumb({ fragmentSource, uniforms }: Props) {
         const renderer = createWebGLRenderer(canvas);
         if (!renderer) return;
         renderer.resize(THUMB_W, THUMB_H);
-        renderer.updateSource(fragmentSource, uniforms);
+        renderer.updatePasses([{ source: fragmentSource, uniforms }]);
         return () => renderer.destroy();
     }, [fragmentSource, uniforms]);
 

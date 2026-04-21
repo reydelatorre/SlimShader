@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { createWebGLRenderer, type WebGLRenderer, type RendererError } from "../lib/webgl-renderer";
-import type { ShaderUniform } from "../lib/shader-store";
+import { createWebGLRenderer, type WebGLRenderer, type RendererError, type PassInfo } from "../lib/webgl-renderer";
 
 interface Props {
-    fragmentSource: string;
-    uniforms: ShaderUniform[];
+    passes: PassInfo[];
     onError: (err: RendererError | null) => void;
 }
 
-export function ShaderPreview({ fragmentSource, uniforms, onError }: Props) {
+export function ShaderPreview({ passes, onError }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rendererRef = useRef<WebGLRenderer | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -18,23 +16,16 @@ export function ShaderPreview({ fragmentSource, uniforms, onError }: Props) {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const renderer = createWebGLRenderer(canvas);
-        if (!renderer) {
-            setSupported(false);
-            return;
-        }
+        if (!renderer) { setSupported(false); return; }
         rendererRef.current = renderer;
-        return () => {
-            renderer.destroy();
-            rendererRef.current = null;
-        };
+        return () => { renderer.destroy(); rendererRef.current = null; };
     }, []);
 
     useEffect(() => {
         const renderer = rendererRef.current;
         if (!renderer) return;
-        const err = renderer.updateSource(fragmentSource, uniforms);
-        onError(err);
-    }, [fragmentSource, uniforms, onError]);
+        onError(renderer.updatePasses(passes));
+    }, [passes, onError]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -57,11 +48,7 @@ export function ShaderPreview({ fragmentSource, uniforms, onError }: Props) {
 
     return (
         <div ref={containerRef} className="flex-1 relative bg-black">
-            <canvas
-                ref={canvasRef}
-                className="absolute inset-0 w-full h-full"
-                style={{ display: "block" }}
-            />
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ display: "block" }} />
         </div>
     );
 }
