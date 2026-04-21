@@ -33,9 +33,7 @@ export function convertToLove2D(shader: ShaderEntry): string {
 
     const converted = userLines
         .map((line) => {
-            return line
-                .replace(/\btexture2D\s*\(/g, "Texel(")
-                .replace(/\btexture\s*\(/g, "Texel(");
+            return line.replace(/\btexture2D\s*\(/g, "Texel(").replace(/\btexture\s*\(/g, "Texel(");
         })
         .join("\n");
 

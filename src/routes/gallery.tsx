@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { fetchPublishedShaders, ensureSignedIn, upsertShader } from "../lib/supabase-sync";
 import { useShaderStore } from "../lib/shader-store";
 import type { ShaderEntry } from "../lib/shader-store";
+import { supabase } from "../lib/supabase";
+import { Logo } from "../components/Logo";
 
 export const Route = createFileRoute("/gallery")({
     component: GalleryPage,
@@ -42,15 +44,18 @@ function GalleryPage() {
         <div className="min-h-screen bg-surface-0 flex flex-col">
             <header className="border-b border-border px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Link
-                        to="/"
-                        className="text-accent-bright font-bold text-base tracking-wider hover:text-white transition-colors"
-                    >
-                        SLIM<span className="text-white">SHADER</span>
+                    <Link to="/">
+                        <Logo className="text-base" />
                     </Link>
                     <span className="text-border">/</span>
                     <span className="text-surface-4 text-xs">gallery</span>
                 </div>
+                <button
+                    onClick={() => supabase.auth.signOut()}
+                    className="text-surface-4 text-xs hover:text-white transition-colors"
+                >
+                    sign out
+                </button>
             </header>
 
             <main className="flex-1 flex flex-col items-center gap-8 px-6 py-12">
@@ -59,13 +64,9 @@ function GalleryPage() {
                     <p className="text-surface-4 text-sm">Published shaders from the community.</p>
                 </div>
 
-                {loading && (
-                    <p className="text-surface-4 text-xs animate-pulse">loading…</p>
-                )}
+                {loading && <p className="text-surface-4 text-xs animate-pulse">loading…</p>}
 
-                {error && (
-                    <p className="text-red-400 text-xs">Failed to load: {error}</p>
-                )}
+                {error && <p className="text-red-400 text-xs">Failed to load: {error}</p>}
 
                 {!loading && !error && shaders.length === 0 && (
                     <p className="text-surface-4 text-xs">

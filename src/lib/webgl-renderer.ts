@@ -39,7 +39,15 @@ function buildFragmentSource(userSource: string, uniforms: ShaderUniform[]): str
         .filter((u) => u.type !== "sampler2D")
         .map((u) => `uniform ${u.type} ${u.name};`)
         .join("\n");
-    return FRAGMENT_WRAPPER_PREFIX + "\n" + extraUniforms + "\n" + userSource + "\n" + FRAGMENT_WRAPPER_SUFFIX;
+    return (
+        FRAGMENT_WRAPPER_PREFIX +
+        "\n" +
+        extraUniforms +
+        "\n" +
+        userSource +
+        "\n" +
+        FRAGMENT_WRAPPER_SUFFIX
+    );
 }
 
 export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {

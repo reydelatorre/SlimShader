@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "@tanstack/react-router";
 import { useShaderStore } from "../lib/shader-store";
+import { supabase } from "../lib/supabase";
+import { Logo } from "./Logo";
 import type { RendererError } from "../lib/webgl-renderer";
 import { ShaderPreview } from "./ShaderPreview";
 import { ShaderEditor } from "./ShaderEditor";
@@ -70,11 +72,8 @@ export function EditorPage() {
         <div className="h-screen flex flex-col bg-surface-0 overflow-hidden">
             {/* Toolbar */}
             <header className="flex-shrink-0 h-10 flex items-center gap-3 px-4 border-b border-border bg-surface-1">
-                <Link
-                    to="/"
-                    className="text-accent-bright font-bold text-xs tracking-wider hover:text-white transition-colors"
-                >
-                    SLIM<span className="text-white">SHADER</span>
+                <Link to="/">
+                    <Logo className="text-xs" />
                 </Link>
                 <span className="text-border">/</span>
 
@@ -106,23 +105,26 @@ export function EditorPage() {
 
                 <button
                     onClick={() => setPublished(shaderId, !shader.published)}
-                    className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                        shader.published
-                            ? "border-accent-bright text-accent-bright hover:bg-accent-bright hover:text-black"
-                            : "border-border text-surface-4 hover:border-white hover:text-white"
-                    }`}
+                    className={`publish-btn${shader.published ? " is-published" : ""}`}
                 >
                     {shader.published ? "published" : "publish"}
                 </button>
 
                 {error && (
-                    <span className="text-red-400 text-[10px] max-w-xs truncate" title={error.message}>
+                    <span
+                        className="text-red-400 text-[10px] max-w-xs truncate"
+                        title={error.message}
+                    >
                         ⚠ {error.type}: {error.message.split("\n")[0]}
                     </span>
                 )}
-                {!error && (
-                    <span className="text-green-500 text-[10px]">● compiled</span>
-                )}
+                {!error && <span className="text-green-500 text-[10px]">● compiled</span>}
+                <button
+                    onClick={() => supabase.auth.signOut()}
+                    className="text-surface-4 text-[10px] hover:text-white transition-colors ml-1"
+                >
+                    sign out
+                </button>
             </header>
 
             {/* Main layout: editor | preview | right panel */}

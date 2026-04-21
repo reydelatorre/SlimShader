@@ -17,10 +17,10 @@ export const SHADER_TOYS: ShaderToy[] = [
         description: "Domain-warped value noise with cycling hue",
         color: "#a855f7",
         uniforms: [
-            { name: "uSpeed",        type: "float", value: 0.4,  min: 0.0, max: 2.0,  step: 0.01 },
-            { name: "uWarpStrength", type: "float", value: 4.0,  min: 0.5, max: 10.0, step: 0.1  },
-            { name: "uHueSpeed",     type: "float", value: 0.1,  min: 0.0, max: 0.5,  step: 0.01 },
-            { name: "uSaturation",   type: "float", value: 0.7,  min: 0.0, max: 1.0,  step: 0.01 },
+            { name: "uSpeed", type: "float", value: 0.4, min: 0.0, max: 2.0, step: 0.01 },
+            { name: "uWarpStrength", type: "float", value: 4.0, min: 0.5, max: 10.0, step: 0.1 },
+            { name: "uHueSpeed", type: "float", value: 0.1, min: 0.0, max: 0.5, step: 0.01 },
+            { name: "uSaturation", type: "float", value: 0.7, min: 0.0, max: 1.0, step: 0.01 },
         ],
         source: `float hash(vec2 p) {
     p = fract(p * vec2(127.1, 311.7));
@@ -78,10 +78,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "Luminance-driven halftone dots with color tinting",
         color: "#06b6d4",
         uniforms: [
-            { name: "uCellSize",  type: "float", value: 14.0, min: 4.0,  max: 40.0, step: 0.5  },
-            { name: "uSpeed",     type: "float", value: 0.6,  min: 0.0,  max: 2.0,  step: 0.01 },
-            { name: "uDotFill",   type: "float", value: 0.48, min: 0.1,  max: 0.8,  step: 0.01 },
-            { name: "uEdgeSoft",  type: "float", value: 1.2,  min: 0.0,  max: 4.0,  step: 0.1  },
+            { name: "uCellSize", type: "float", value: 14.0, min: 4.0, max: 40.0, step: 0.5 },
+            { name: "uSpeed", type: "float", value: 0.6, min: 0.0, max: 2.0, step: 0.01 },
+            { name: "uDotFill", type: "float", value: 0.48, min: 0.1, max: 0.8, step: 0.01 },
+            { name: "uEdgeSoft", type: "float", value: 1.2, min: 0.0, max: 4.0, step: 0.1 },
         ],
         source: `float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -129,10 +129,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "RGB subpixel grid, scanlines, and barrel distortion",
         color: "#22c55e",
         uniforms: [
-            { name: "uBarrel",     type: "float", value: 0.15, min: 0.0,  max: 0.5,   step: 0.01  },
-            { name: "uScanSpeed", type: "float", value: 80.0, min: 0.0,  max: 200.0, step: 1.0   },
-            { name: "uScanDepth", type: "float", value: 0.15, min: 0.0,  max: 0.5,   step: 0.01  },
-            { name: "uVignette",  type: "float", value: 18.0, min: 1.0,  max: 40.0,  step: 0.5   },
+            { name: "uBarrel", type: "float", value: 0.15, min: 0.0, max: 0.5, step: 0.01 },
+            { name: "uScanSpeed", type: "float", value: 80.0, min: 0.0, max: 200.0, step: 1.0 },
+            { name: "uScanDepth", type: "float", value: 0.15, min: 0.0, max: 0.5, step: 0.01 },
+            { name: "uVignette", type: "float", value: 18.0, min: 1.0, max: 40.0, step: 0.5 },
         ],
         source: `vec2 barrel(vec2 uv) {
     uv = uv * 2.0 - 1.0;
@@ -192,10 +192,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "Animated Voronoi cells with glowing edges",
         color: "#f97316",
         uniforms: [
-            { name: "uScale",     type: "float", value: 4.5,  min: 1.0,  max: 12.0, step: 0.1  },
-            { name: "uSpeed",     type: "float", value: 0.5,  min: 0.0,  max: 2.0,  step: 0.01 },
-            { name: "uEdgeGlow",  type: "float", value: 12.0, min: 1.0,  max: 30.0, step: 0.5  },
-            { name: "uPulseRate", type: "float", value: 2.0,  min: 0.0,  max: 6.0,  step: 0.1  },
+            { name: "uScale", type: "float", value: 4.5, min: 1.0, max: 12.0, step: 0.1 },
+            { name: "uSpeed", type: "float", value: 0.5, min: 0.0, max: 2.0, step: 0.01 },
+            { name: "uEdgeGlow", type: "float", value: 12.0, min: 1.0, max: 30.0, step: 0.5 },
+            { name: "uPulseRate", type: "float", value: 2.0, min: 0.0, max: 6.0, step: 0.1 },
         ],
         source: `vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -262,10 +262,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "RGB-split interference field",
         color: "#ec4899",
         uniforms: [
-            { name: "uFreq",     type: "float", value: 8.0,   min: 1.0,  max: 20.0, step: 0.1  },
-            { name: "uTwist",    type: "float", value: 1.0,   min: 0.0,  max: 4.0,  step: 0.05 },
-            { name: "uShift",    type: "float", value: 0.025, min: 0.0,  max: 0.1,  step: 0.001 },
-            { name: "uSpeed",    type: "float", value: 0.5,   min: 0.0,  max: 2.0,  step: 0.01 },
+            { name: "uFreq", type: "float", value: 8.0, min: 1.0, max: 20.0, step: 0.1 },
+            { name: "uTwist", type: "float", value: 1.0, min: 0.0, max: 4.0, step: 0.05 },
+            { name: "uShift", type: "float", value: 0.025, min: 0.0, max: 0.1, step: 0.001 },
+            { name: "uSpeed", type: "float", value: 0.5, min: 0.0, max: 2.0, step: 0.01 },
         ],
         source: `float field(vec2 uv, float freq, float t, float phase) {
     float a = sin(uv.x * freq + t + phase);
@@ -304,10 +304,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "4x4 ordered dithering on an animated gradient",
         color: "#eab308",
         uniforms: [
-            { name: "uLevels", type: "float", value: 4.0,  min: 2.0,  max: 16.0, step: 1.0  },
-            { name: "uSpeed",  type: "float", value: 0.3,  min: 0.0,  max: 1.0,  step: 0.01 },
-            { name: "uFreqX",  type: "float", value: 4.0,  min: 0.5,  max: 12.0, step: 0.1  },
-            { name: "uFreqY",  type: "float", value: 3.0,  min: 0.5,  max: 12.0, step: 0.1  },
+            { name: "uLevels", type: "float", value: 4.0, min: 2.0, max: 16.0, step: 1.0 },
+            { name: "uSpeed", type: "float", value: 0.3, min: 0.0, max: 1.0, step: 0.01 },
+            { name: "uFreqX", type: "float", value: 4.0, min: 0.5, max: 12.0, step: 0.1 },
+            { name: "uFreqY", type: "float", value: 3.0, min: 0.5, max: 12.0, step: 0.1 },
         ],
         source: `// 4x4 Bayer threshold in float arithmetic (GLSL ES 1.00 compatible)
 float bayerThreshold(vec2 p) {

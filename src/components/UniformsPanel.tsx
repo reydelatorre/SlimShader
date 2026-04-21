@@ -184,7 +184,9 @@ export function UniformsPanel({ uniforms, onAdd, onUpdate, onRemove, onValueChan
     return (
         <div className="flex flex-col h-full">
             <div className="px-3 py-2 border-b border-border">
-                <p className="text-[10px] text-surface-4 uppercase tracking-widest mb-2">Uniforms</p>
+                <p className="text-[10px] text-surface-4 uppercase tracking-widest mb-2">
+                    Uniforms
+                </p>
                 <div className="flex gap-1.5">
                     <input
                         type="text"

@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useShaderStore } from "../lib/shader-store";
 import { SHADER_TOYS } from "../lib/shader-toys";
+import { Logo } from "../components/Logo";
+import { supabase } from "../lib/supabase";
 
 export const Route = createFileRoute("/")({
     component: HomePage,
@@ -30,23 +32,29 @@ function HomePage() {
         <div className="min-h-screen bg-surface-0 flex flex-col">
             <header className="border-b border-border px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <span className="text-accent-bright font-bold text-base tracking-wider">
-                        SLIM<span className="text-white">SHADER</span>
-                    </span>
+                    <Logo className="text-base" />
                     <span className="text-surface-4 text-xs">/ GLSL editor + Love2D exporter</span>
                 </div>
-                <Link
-                    to="/gallery"
-                    className="text-surface-4 text-xs hover:text-white transition-colors"
-                >
-                    gallery →
-                </Link>
+                <div className="flex items-center gap-4">
+                    <Link
+                        to="/gallery"
+                        className="text-surface-4 text-xs hover:text-white transition-colors"
+                    >
+                        gallery →
+                    </Link>
+                    <button
+                        onClick={() => supabase.auth.signOut()}
+                        className="text-surface-4 text-xs hover:text-white transition-colors"
+                    >
+                        sign out
+                    </button>
+                </div>
             </header>
 
             <main className="flex-1 flex flex-col items-center gap-12 px-6 py-12">
                 <div className="text-center">
-                    <h1 className="text-4xl font-bold text-white tracking-tight mb-2">
-                        Slim<span className="text-accent-bright">Shader</span>
+                    <h1 className="text-4xl font-bold tracking-tight mb-2">
+                        <Logo className="text-4xl" />
                     </h1>
                     <p className="text-surface-4 text-sm">
                         Write GLSL fragment shaders. Preview in real time. Export for Love2D.
@@ -62,7 +70,9 @@ function HomePage() {
 
                 {/* Starter shaders */}
                 <div className="w-full max-w-3xl">
-                    <p className="text-xs text-surface-4 mb-4 uppercase tracking-widest">Starter Shaders</p>
+                    <p className="text-xs text-surface-4 mb-4 uppercase tracking-widest">
+                        Starter Shaders
+                    </p>
                     <div className="grid grid-cols-3 gap-3">
                         {SHADER_TOYS.map((toy, i) => (
                             <button
@@ -89,7 +99,9 @@ function HomePage() {
                 {/* Recent shaders */}
                 {shaders.length > 0 && (
                     <div className="w-full max-w-3xl">
-                        <p className="text-xs text-surface-4 mb-3 uppercase tracking-widest">Recent</p>
+                        <p className="text-xs text-surface-4 mb-3 uppercase tracking-widest">
+                            Recent
+                        </p>
                         <div className="flex flex-col gap-2">
                             {shaders.map((s) => (
                                 <div

@@ -101,7 +101,11 @@ export const useShaderStore = create<ShaderState>()(
                 set((s) => ({
                     shaders: s.shaders.map((sh) => {
                         if (sh.id !== shaderId) return sh;
-                        updated = { ...sh, uniforms: [...sh.uniforms, uniform], updatedAt: Date.now() };
+                        updated = {
+                            ...sh,
+                            uniforms: [...sh.uniforms, uniform],
+                            updatedAt: Date.now(),
+                        };
                         return updated;
                     }),
                 }));
@@ -115,7 +119,9 @@ export const useShaderStore = create<ShaderState>()(
                         if (sh.id !== shaderId) return sh;
                         updated = {
                             ...sh,
-                            uniforms: sh.uniforms.map((u) => (u.name === name ? { ...u, ...patch } : u)),
+                            uniforms: sh.uniforms.map((u) =>
+                                u.name === name ? { ...u, ...patch } : u
+                            ),
                             updatedAt: Date.now(),
                         };
                         return updated;

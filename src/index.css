@@ -35,6 +35,37 @@
     animation: logo-sweep 4s linear infinite;
 }
 
+.publish-btn {
+    position: relative;
+    padding: 3px 10px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    border: 1px solid #3a3a3a;
+    color: #888;
+    background: transparent;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.publish-btn:hover,
+.publish-btn.is-published {
+    border-color: transparent;
+    color: transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    background-image: linear-gradient(90deg, #ff2d78, #bf5af2, #01cdfe, #05ffa1, #bf5af2, #ff2d78);
+    background-size: 200% auto;
+    animation: logo-sweep 4s linear infinite;
+    /* gradient border via outline trick */
+    box-shadow: 0 0 0 1px #bf5af2;
+}
+
+.publish-btn.is-published {
+    box-shadow: 0 0 0 1px #ff2d78, 0 0 8px 0 rgba(191, 90, 242, 0.35);
+}
+
 * {
     box-sizing: border-box;
 }

@@ -107,7 +107,10 @@ function registerGLSL(monaco: typeof import("monaco-editor")) {
                 [/[{}()\[\]]/, "delimiter.bracket"],
                 [/[;,.]/, "delimiter"],
             ],
-            comment: [[/\*\//, "comment", "@pop"], [/./, "comment"]],
+            comment: [
+                [/\*\//, "comment", "@pop"],
+                [/./, "comment"],
+            ],
         },
     });
 
@@ -169,7 +172,10 @@ function registerGLSL(monaco: typeof import("monaco-editor")) {
 }
 
 export function ShaderEditor({ value, onChange }: Props) {
-    function handleMount(_editor: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) {
+    function handleMount(
+        _editor: editor.IStandaloneCodeEditor,
+        monaco: typeof import("monaco-editor")
+    ) {
         registerGLSL(monaco);
     }
 

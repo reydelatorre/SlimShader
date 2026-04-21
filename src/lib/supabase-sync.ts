@@ -36,11 +36,11 @@ export function rowToEntry(row: ShaderRow): ShaderEntry {
 }
 
 export async function ensureSignedIn(): Promise<string> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) return session.user.id;
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error || !data.user) throw new Error("Auth failed: " + error?.message);
-    return data.user.id;
+    const {
+        data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error("Not authenticated.");
+    return session.user.id;
 }
 
 export async function fetchRemoteShaders(): Promise<ShaderEntry[]> {
