@@ -9,6 +9,7 @@ export interface ShaderUniform {
     name: string;
     type: UniformType;
     value: number | number[] | boolean;
+    isColor?: boolean;
     min?: number;
     max?: number;
     step?: number;

@@ -95,9 +95,16 @@ export function EditorPage() {
                 ) : (
                     <button
                         onClick={() => setEditingName(true)}
-                        className="text-white text-xs hover:text-accent-bright transition-colors"
+                        title="Click to rename"
+                        className="group flex items-center gap-1 text-white text-xs hover:text-accent-bright transition-colors border-b border-dashed border-surface-4 hover:border-accent-bright"
                     >
                         {shader.name}
+                        <svg
+                            className="opacity-0 group-hover:opacity-100 transition-opacity w-3 h-3 flex-shrink-0"
+                            viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"
+                        >
+                            <path d="M8.5 1.5l2 2-6 6H2.5v-2l6-6z" />
+                        </svg>
                     </button>
                 )}
 

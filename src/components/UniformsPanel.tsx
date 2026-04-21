@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ShaderUniform, UniformType } from "../lib/shader-store";
+import { ColorPicker } from "./ColorPicker";
 
 interface Props {
     uniforms: ShaderUniform[];
@@ -86,9 +87,17 @@ function UniformRow({
                         value={v}
                         step={uniform.step ?? (uniform.type === "int" ? 1 : 0.01)}
                         onChange={(e) => onValueChange(uniform.name, parseFloat(e.target.value))}
-                        className="w-16 bg-surface-3 text-white text-xs px-1 py-0.5 border border-border text-right"
+                        className="w-16 bg-surface-3 text-white text-xs px-2 py-1.5 border border-border text-right"
                     />
                 </div>
+            );
+        }
+        if ((uniform.type === "vec3" || uniform.type === "vec4") && uniform.isColor) {
+            return (
+                <ColorPicker
+                    value={uniform.value as number[]}
+                    onChange={(v) => onValueChange(uniform.name, v)}
+                />
             );
         }
         if (components.length > 0) {
@@ -107,7 +116,7 @@ function UniformRow({
                                     next[i] = parseFloat(e.target.value);
                                     onValueChange(uniform.name, next);
                                 }}
-                                className="w-full bg-surface-3 text-white text-xs px-1 py-0.5 border border-border text-right"
+                                className="w-full bg-surface-3 text-white text-xs px-2 py-1.5 border border-border text-right"
                             />
                         </div>
                     ))}
@@ -124,12 +133,25 @@ function UniformRow({
                     <span className="text-accent-bright text-xs font-medium">{uniform.name}</span>
                     <span className="text-surface-4 text-[10px]">{uniform.type}</span>
                 </div>
-                <button
-                    onClick={() => onRemove(uniform.name)}
-                    className="opacity-0 group-hover:opacity-100 text-surface-4 hover:text-red-400 text-[10px] transition-all"
-                >
-                    remove
-                </button>
+                <div className="flex items-center gap-2">
+                    {(uniform.type === "vec3" || uniform.type === "vec4") && (
+                        <label className="flex items-center gap-1 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={!!uniform.isColor}
+                                onChange={(e) => onUpdate(uniform.name, { isColor: e.target.checked })}
+                                className="accent-accent"
+                            />
+                            <span className="text-surface-4 text-[10px]">color</span>
+                        </label>
+                    )}
+                    <button
+                        onClick={() => onRemove(uniform.name)}
+                        className="opacity-0 group-hover:opacity-100 text-surface-4 hover:text-red-400 text-[10px] transition-all"
+                    >
+                        remove
+                    </button>
+                </div>
             </div>
             <div className="flex items-center gap-2">{renderControl()}</div>
             {(uniform.type === "float" || uniform.type === "int") && (
@@ -143,7 +165,7 @@ function UniformRow({
                             onChange={(e) =>
                                 onUpdate(uniform.name, { min: parseFloat(e.target.value) })
                             }
-                            className="w-12 bg-surface-3 text-white px-1 py-0.5 border border-border text-right"
+                            className="w-12 bg-surface-3 text-white px-2 py-1.5 border border-border text-right"
                         />
                     </label>
                     <label className="flex items-center gap-1">
@@ -155,7 +177,7 @@ function UniformRow({
                             onChange={(e) =>
                                 onUpdate(uniform.name, { max: parseFloat(e.target.value) })
                             }
-                            className="w-12 bg-surface-3 text-white px-1 py-0.5 border border-border text-right"
+                            className="w-12 bg-surface-3 text-white px-2 py-1.5 border border-border text-right"
                         />
                     </label>
                 </div>

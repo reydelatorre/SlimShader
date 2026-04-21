@@ -66,6 +66,17 @@
     box-shadow: 0 0 0 1px #ff2d78, 0 0 8px 0 rgba(191, 90, 242, 0.35);
 }
 
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
 * {
     box-sizing: border-box;
 }

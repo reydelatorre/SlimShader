@@ -75,24 +75,41 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // ─────────────────────────────────────────────
     {
         name: "Halftone Screen",
-        description: "Luminance-driven halftone dots with color tinting",
+        description: "Luminance-driven halftone dots with multi-color palette",
         color: "#06b6d4",
         uniforms: [
-            { name: "uCellSize", type: "float", value: 14.0, min: 4.0, max: 40.0, step: 0.5 },
-            { name: "uSpeed", type: "float", value: 0.6, min: 0.0, max: 2.0, step: 0.01 },
-            { name: "uDotFill", type: "float", value: 0.48, min: 0.1, max: 0.8, step: 0.01 },
-            { name: "uEdgeSoft", type: "float", value: 1.2, min: 0.0, max: 4.0, step: 0.1 },
+            { name: "uCellSize",   type: "float", value: 14.0,             min: 4.0, max: 40.0, step: 0.5  },
+            { name: "uSpeed",      type: "float", value: 0.6,              min: 0.0, max: 2.0,  step: 0.01 },
+            { name: "uDotFill",    type: "float", value: 0.48,             min: 0.1, max: 0.8,  step: 0.01 },
+            { name: "uEdgeSoft",   type: "float", value: 1.2,              min: 0.0, max: 4.0,  step: 0.1  },
+            { name: "uColorCount", type: "float", value: 6.0,              min: 2.0, max: 6.0,  step: 1.0  },
+            { name: "uRandomize",  type: "bool",  value: false },
+            { name: "uColor0",     type: "vec3",  value: [0.0, 0.6, 0.9], isColor: true },
+            { name: "uColor1",     type: "vec3",  value: [0.9, 0.1, 0.5], isColor: true },
+            { name: "uColor2",     type: "vec3",  value: [0.1, 0.9, 0.5], isColor: true },
+            { name: "uColor3",     type: "vec3",  value: [0.9, 0.8, 0.1], isColor: true },
+            { name: "uColor4",     type: "vec3",  value: [0.7, 0.1, 0.9], isColor: true },
+            { name: "uColor5",     type: "vec3",  value: [1.0, 0.4, 0.1], isColor: true },
         ],
         source: `float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
 float plasma(vec2 uv, float t) {
-    float a = sin(uv.x * 3.0 + t);
-    float b = sin(uv.y * 2.5 - t * 0.7);
-    float c = sin((uv.x + uv.y) * 2.0 + t * 0.5);
-    float d = sin(length(uv - 0.5) * 6.0 - t * 1.2);
-    return (a + b + c + d) * 0.25 + 0.5;
+    return (sin(uv.x * 3.0 + t) + sin(uv.y * 2.5 - t * 0.7)
+          + sin((uv.x + uv.y) * 2.0 + t * 0.5)
+          + sin(length(uv - 0.5) * 6.0 - t * 1.2)) * 0.25 + 0.5;
+}
+
+// select from up to 6 named color slots by float index
+vec3 pickColor(float i) {
+    float n = mod(floor(i), uColorCount);
+    if (n < 0.5) return uColor0;
+    if (n < 1.5) return uColor1;
+    if (n < 2.5) return uColor2;
+    if (n < 3.5) return uColor3;
+    if (n < 4.5) return uColor4;
+    return uColor5;
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
@@ -102,20 +119,18 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     vec2 cell = floor(fragCoord / uCellSize);
     vec2 cellCenter = (cell + 0.5) * uCellSize;
-    vec2 cellUV = cellCenter / res;
 
-    float lum = plasma(cellUV, t);
+    float lum = plasma(cellCenter / res, t);
     float radius = lum * uCellSize * uDotFill;
+    float dot_ = smoothstep(radius, radius - uEdgeSoft, length(fragCoord - cellCenter));
 
-    float dist = length(fragCoord - cellCenter);
-    float dot_ = smoothstep(radius, radius - uEdgeSoft, dist);
-
-    float hshift = hash(cell) * 0.15;
-    vec3 col = mix(
-        vec3(0.0, 0.6, 0.9),
-        vec3(0.9, 0.1, 0.5),
-        fract(lum + hshift)
-    );
+    vec3 col;
+    if (uRandomize) {
+        col = pickColor(floor(hash(cell) * uColorCount));
+    } else {
+        float pos = fract(lum + hash(cell) * 0.15) * (uColorCount - 1.0);
+        col = mix(pickColor(floor(pos)), pickColor(floor(pos) + 1.0), fract(pos));
+    }
 
     fragColor = vec4(col * dot_, 1.0);
 }`,
@@ -192,10 +207,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "Animated Voronoi cells with glowing edges",
         color: "#f97316",
         uniforms: [
-            { name: "uScale", type: "float", value: 4.5, min: 1.0, max: 12.0, step: 0.1 },
-            { name: "uSpeed", type: "float", value: 0.5, min: 0.0, max: 2.0, step: 0.01 },
-            { name: "uEdgeGlow", type: "float", value: 12.0, min: 1.0, max: 30.0, step: 0.5 },
-            { name: "uPulseRate", type: "float", value: 2.0, min: 0.0, max: 6.0, step: 0.1 },
+            { name: "uScale",     type: "float", value: 4.5,              min: 1.0, max: 12.0, step: 0.1  },
+            { name: "uSpeed",     type: "float", value: 0.5,              min: 0.0, max: 2.0,  step: 0.01 },
+            { name: "uEdgeGlow",  type: "float", value: 12.0,             min: 1.0, max: 30.0, step: 0.5  },
+            { name: "uPulseRate", type: "float", value: 2.0,              min: 0.0, max: 6.0,  step: 0.1  },
+            { name: "uGlowColor", type: "vec3",  value: [1.0, 0.6, 0.1], isColor: true },
         ],
         source: `vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -244,7 +260,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     ) + t);
 
     float glow = exp(-edge * uEdgeGlow);
-    vec3 glowCol = vec3(1.0, 0.6, 0.1) * glow;
+    vec3 glowCol = uGlowColor * glow;
 
     float pulse = 0.6 + 0.4 * sin(cellId.x * 20.0 + iTime * uPulseRate);
     vec3 col = cellCol * pulse * 0.5 + glowCol;
@@ -304,12 +320,15 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         description: "Ordered dithering — variable matrix size and pixel dimensions",
         color: "#eab308",
         uniforms: [
-            { name: "uMatrixBits", type: "float", value: 2.0, min: 1.0, max: 3.0, step: 1.0 },
-            { name: "uPixelSize",  type: "float", value: 2.0, min: 1.0, max: 16.0, step: 1.0 },
-            { name: "uLevels",     type: "float", value: 4.0, min: 2.0, max: 16.0, step: 1.0 },
-            { name: "uSpeed",      type: "float", value: 0.3, min: 0.0, max: 1.0,  step: 0.01 },
-            { name: "uFreqX",      type: "float", value: 4.0, min: 0.5, max: 12.0, step: 0.1 },
-            { name: "uFreqY",      type: "float", value: 3.0, min: 0.5, max: 12.0, step: 0.1 },
+            { name: "uMatrixBits", type: "float", value: 2.0,              min: 1.0, max: 3.0,  step: 1.0  },
+            { name: "uPixelSize",  type: "float", value: 2.0,              min: 1.0, max: 16.0, step: 1.0  },
+            { name: "uLevels",     type: "float", value: 4.0,              min: 2.0, max: 16.0, step: 1.0  },
+            { name: "uSpeed",      type: "float", value: 0.3,              min: 0.0, max: 1.0,  step: 0.01 },
+            { name: "uFreqX",      type: "float", value: 4.0,              min: 0.5, max: 12.0, step: 0.1  },
+            { name: "uFreqY",      type: "float", value: 3.0,              min: 0.5, max: 12.0, step: 0.1  },
+            { name: "uColorA",     type: "vec3",  value: [0.05, 0.05, 0.3], isColor: true },
+            { name: "uColorB",     type: "vec3",  value: [0.8, 0.1, 0.6],  isColor: true },
+            { name: "uColorC",     type: "vec3",  value: [0.9, 0.7, 0.1],  isColor: true },
         ],
         source: `// Bayer threshold for matrices up to 8x8 (uMatrixBits: 1=2x2, 2=4x4, 3=8x8)
 // Accumulates XOR-based bit levels in float arithmetic (GLSL ES 1.00)
@@ -326,8 +345,7 @@ float bayer(vec2 p) {
 }
 
 vec3 palette(float t) {
-    vec3 a = vec3(0.05, 0.05, 0.3), b = vec3(0.8, 0.1, 0.6), c = vec3(0.9, 0.7, 0.1);
-    return t < 0.5 ? mix(a, b, t * 2.0) : mix(b, c, t * 2.0 - 1.0);
+    return t < 0.5 ? mix(uColorA, uColorB, t * 2.0) : mix(uColorB, uColorC, t * 2.0 - 1.0);
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
