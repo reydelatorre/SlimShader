@@ -167,7 +167,7 @@ export const useShaderStore = create<ShaderState>()(
             migrate(state: unknown, version: number) {
                 const s = state as { shaders: ShaderEntry[] };
                 if (version === 0) {
-                    s.shaders = s.shaders.map((sh) => ({ published: false, ...sh }));
+                    s.shaders = s.shaders.map((sh) => ({ ...sh, published: sh.published ?? false }));
                 }
                 return s;
             },
