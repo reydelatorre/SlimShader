@@ -20,6 +20,7 @@ export interface ShaderEntry {
     name: string;
     fragmentSource: string;
     uniforms: ShaderUniform[];
+    passes: string[];
     published: boolean;
     createdAt: number;
     updatedAt: number;
@@ -35,6 +36,9 @@ interface ShaderState {
     addUniform: (shaderId: string, uniform: ShaderUniform) => void;
     updateUniform: (shaderId: string, name: string, patch: Partial<ShaderUniform>) => void;
     removeUniform: (shaderId: string, name: string) => void;
+    addPass: (shaderId: string, passId: string) => void;
+    removePass: (shaderId: string, index: number) => void;
+    reorderPass: (shaderId: string, from: number, to: number) => void;
     seedFromRemote: (entries: ShaderEntry[]) => void;
 }
 
@@ -55,6 +59,7 @@ export const useShaderStore = create<ShaderState>()(
                     name: "Untitled Shader",
                     fragmentSource: DEFAULT_FRAGMENT_SHADER,
                     uniforms: [],
+                    passes: [],
                     published: false,
                     createdAt: now,
                     updatedAt: now,
@@ -147,6 +152,44 @@ export const useShaderStore = create<ShaderState>()(
                 if (updated) syncEntry(updated);
             },
 
+            addPass(shaderId, passId) {
+                let updated: ShaderEntry | undefined;
+                set((s) => ({
+                    shaders: s.shaders.map((sh) => {
+                        if (sh.id !== shaderId) return sh;
+                        updated = { ...sh, passes: [...sh.passes, passId], updatedAt: Date.now() };
+                        return updated;
+                    }),
+                }));
+                if (updated) syncEntry(updated);
+            },
+
+            removePass(shaderId, index) {
+                let updated: ShaderEntry | undefined;
+                set((s) => ({
+                    shaders: s.shaders.map((sh) => {
+                        if (sh.id !== shaderId) return sh;
+                        updated = { ...sh, passes: sh.passes.filter((_, i) => i !== index), updatedAt: Date.now() };
+                        return updated;
+                    }),
+                }));
+                if (updated) syncEntry(updated);
+            },
+
+            reorderPass(shaderId, from, to) {
+                let updated: ShaderEntry | undefined;
+                set((s) => ({
+                    shaders: s.shaders.map((sh) => {
+                        if (sh.id !== shaderId) return sh;
+                        const next = [...sh.passes];
+                        next.splice(to, 0, next.splice(from, 1)[0]);
+                        updated = { ...sh, passes: next, updatedAt: Date.now() };
+                        return updated;
+                    }),
+                }));
+                if (updated) syncEntry(updated);
+            },
+
             seedFromRemote(entries) {
                 set((s) => {
                     const map = new Map(s.shaders.map((sh) => [sh.id, sh]));
@@ -164,11 +207,14 @@ export const useShaderStore = create<ShaderState>()(
         }),
         {
             name: "slimshader-store",
-            version: 1,
+            version: 2,
             migrate(state: unknown, version: number) {
                 const s = state as { shaders: ShaderEntry[] };
                 if (version === 0) {
                     s.shaders = s.shaders.map((sh) => ({ ...sh, published: sh.published ?? false }));
+                }
+                if (version <= 1) {
+                    s.shaders = s.shaders.map((sh) => ({ ...sh, passes: sh.passes ?? [] }));
                 }
                 return s;
             },

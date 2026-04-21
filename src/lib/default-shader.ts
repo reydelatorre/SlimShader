@@ -28,9 +28,10 @@ void main() {
 
 export const FRAGMENT_WRAPPER_PREFIX = `
 precision mediump float;
-uniform float iTime;
-uniform vec2  iResolution;
-uniform vec4  iMouse;
+uniform float     iTime;
+uniform vec2      iResolution;
+uniform vec4      iMouse;
+uniform sampler2D iChannel0;
 `;
 
 export const FRAGMENT_WRAPPER_SUFFIX = `
