@@ -200,72 +200,49 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     },
 
     // ─────────────────────────────────────────────
-    // 4. Voronoi Pulse
+    // 4. Turbulence Fluid
     // ─────────────────────────────────────────────
     {
-        name: "Voronoi Pulse",
-        description: "Animated Voronoi cells with glowing edges",
+        name: "Turbulence Fluid",
+        description: "XorDev turbulence — layered rotated sine waves warp UV space",
         color: "#f97316",
         uniforms: [
-            { name: "uScale",     type: "float", value: 4.5,              min: 1.0, max: 12.0, step: 0.1  },
-            { name: "uSpeed",     type: "float", value: 0.5,              min: 0.0, max: 2.0,  step: 0.01 },
-            { name: "uEdgeGlow",  type: "float", value: 12.0,             min: 1.0, max: 30.0, step: 0.5  },
-            { name: "uPulseRate", type: "float", value: 2.0,              min: 0.0, max: 6.0,  step: 0.1  },
-            { name: "uGlowColor", type: "vec3",  value: [1.0, 0.6, 0.1], isColor: true },
+            { name: "uSpeed",  type: "float", value: 0.3,               min: 0.0, max: 1.5, step: 0.01 },
+            { name: "uScale",  type: "float", value: 1.2,               min: 0.2, max: 4.0, step: 0.05 },
+            { name: "uAmp",    type: "float", value: 0.7,               min: 0.1, max: 2.0, step: 0.05 },
+            { name: "uGrowth", type: "float", value: 1.4,               min: 1.1, max: 2.5, step: 0.05 },
+            { name: "uColorA", type: "vec3",  value: [0.1, 0.2, 0.8],  isColor: true },
+            { name: "uColorB", type: "vec3",  value: [0.9, 0.1, 0.5],  isColor: true },
+            { name: "uColorC", type: "vec3",  value: [0.0, 0.8, 0.6],  isColor: true },
         ],
-        source: `vec2 hash2(vec2 p) {
-    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-    return fract(sin(p) * 43758.5453);
-}
-
-float voronoi(vec2 uv, float t, out float edge) {
-    vec2 i = floor(uv);
-    vec2 f = fract(uv);
-
-    float minDist  = 9.0;
-    float minDist2 = 9.0;
-
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            vec2 neighbor = vec2(float(x), float(y));
-            vec2 h = hash2(i + neighbor);
-            vec2 point = neighbor + h + 0.5 * sin(h * 6.28318 + t);
-            float d = length(f - point);
-            if (d < minDist) {
-                minDist2 = minDist;
-                minDist = d;
-            } else if (d < minDist2) {
-                minDist2 = d;
-            }
-        }
+        source: `// Based on XorDev's "Turbulent Dark" — https://mini.gmshaders.com/p/turbulence
+vec2 turbulence(vec2 p, float t) {
+    float freq  = 2.0;
+    float angle = 0.0;
+    for (int i = 0; i < 8; i++) {
+        float c = sin(angle + 1.5707963);
+        float s = sin(angle);
+        float phase = freq * (p.x * s + p.y * c) + t + float(i);
+        float disp  = uAmp * sin(phase) / freq;
+        p.x += disp * c;
+        p.y -= disp * s;
+        angle += 0.9272952;
+        freq  *= uGrowth;
     }
-    edge = minDist2 - minDist;
-    return minDist;
+    return p;
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     vec2 uv = fragCoord / iResolution.xy;
+    uv = uv * 2.0 - 1.0;
     uv.x *= iResolution.x / iResolution.y;
-    uv *= uScale;
 
     float t = iTime * uSpeed;
-    float edge;
-    float d = voronoi(uv, t, edge);
+    vec2 w = turbulence(uv * uScale, t);
 
-    vec2 cellId = hash2(floor(uv + hash2(floor(uv))));
-    vec3 cellCol = 0.5 + 0.5 * sin(vec3(
-        cellId.x * 6.28318,
-        cellId.y * 6.28318 + 2.094,
-        (cellId.x + cellId.y) * 6.28318 + 4.189
-    ) + t);
-
-    float glow = exp(-edge * uEdgeGlow);
-    vec3 glowCol = uGlowColor * glow;
-
-    float pulse = 0.6 + 0.4 * sin(cellId.x * 20.0 + iTime * uPulseRate);
-    vec3 col = cellCol * pulse * 0.5 + glowCol;
-    col *= 0.5 + 0.5 * smoothstep(0.0, 0.4, d);
-
+    float h1 = sin(w.x * 3.0 + t) * 0.5 + 0.5;
+    float h2 = sin(w.y * 2.5 - t * 0.7) * 0.5 + 0.5;
+    vec3 col = mix(mix(uColorA, uColorB, h1), uColorC, h2);
     fragColor = vec4(col, 1.0);
 }`,
     },
@@ -358,6 +335,108 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     fragColor = vec4(f.r > t ? lo.r + s : lo.r,
                      f.g > t ? lo.g + s : lo.g,
                      f.b > t ? lo.b + s : lo.b, 1.0);
+}`,
+    },
+
+    // ─────────────────────────────────────────────
+    // 7. Bloom Edge Grid
+    // ─────────────────────────────────────────────
+    {
+        name: "Bloom Edge Grid",
+        description: "Glowing sine-wave grid lines with bloom falloff",
+        color: "#38bdf8",
+        uniforms: [
+            { name: "uSpeed",    type: "float", value: 0.4,              min: 0.0,   max: 2.0,  step: 0.01  },
+            { name: "uRepeat",   type: "float", value: 6.0,              min: 1.0,   max: 20.0, step: 0.5   },
+            { name: "uEdge",     type: "float", value: 0.012,            min: 0.001, max: 0.1,  step: 0.001 },
+            { name: "uExponent", type: "float", value: 1.4,              min: 0.5,   max: 4.0,  step: 0.1   },
+            { name: "uColor",    type: "vec3",  value: [0.2, 0.8, 1.0], isColor: true },
+        ],
+        source: `// Ported from bloom-edge-pattern.ts + bloom.ts + repeating-pattern.ts (Three TSL)
+float repPattern(float p, float repeat, float t) {
+    return sin(p * repeat + t) / repeat;
+}
+
+float bloomEdge(float p, float edge, float exponent) {
+    return pow(edge / max(abs(p), 0.00001), exponent);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    uv = uv * 2.0 - 1.0;
+    uv.x *= iResolution.x / iResolution.y;
+
+    float t = iTime * uSpeed;
+
+    float px = repPattern(uv.x, uRepeat, t);
+    float py = repPattern(uv.y, uRepeat, t * 0.7 + 1.5708);
+
+    float bx = clamp(bloomEdge(px, uEdge, uExponent), 0.0, 1.0);
+    float by = clamp(bloomEdge(py, uEdge, uExponent), 0.0, 1.0);
+    float b  = max(bx, by);
+
+    fragColor = vec4(uColor * b, 1.0);
+}`,
+    },
+
+    // ─────────────────────────────────────────────
+    // 8. Ridge Noise
+    // ─────────────────────────────────────────────
+    {
+        name: "Ridge Noise",
+        description: "Fractal ridge noise — sharp peaks, soft valleys",
+        color: "#84cc16",
+        uniforms: [
+            { name: "uSpeed",     type: "float", value: 0.08,              min: 0.0, max: 0.5,  step: 0.005 },
+            { name: "uScale",     type: "float", value: 3.0,               min: 0.5, max: 8.0,  step: 0.1   },
+            { name: "uColorLow",  type: "vec3",  value: [0.05, 0.08, 0.2], isColor: true },
+            { name: "uColorMid",  type: "vec3",  value: [0.3, 0.55, 0.4],  isColor: true },
+            { name: "uColorHigh", type: "vec3",  value: [0.95, 0.95, 0.9], isColor: true },
+        ],
+        source: `// Ported from ridge-noise.ts (Three TSL)
+float hash(vec2 p) {
+    p = fract(p * vec2(127.1, 311.7));
+    p += dot(p, p + 19.19);
+    return fract(p.x * p.y);
+}
+
+float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i),              hash(i + vec2(1.0, 0.0)), u.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+float ridge(vec2 p) {
+    float v = 0.0, amp = 0.5, freq = 1.0, w = 1.0;
+    for (int i = 0; i < 6; i++) {
+        float n = 1.0 - abs(vnoise(p * freq) * 2.0 - 1.0);
+        n = n * n * w;
+        v += n * amp;
+        w = clamp(n, 0.0, 1.0);
+        freq *= 2.0;
+        amp  *= 0.5;
+    }
+    return v;
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
+    uv.x *= iResolution.x / iResolution.y;
+
+    float t = iTime * uSpeed;
+    float h = ridge(uv * uScale + vec2(t, t * 0.4));
+
+    vec3 col;
+    if (h < 0.5) {
+        col = mix(uColorLow, uColorMid, h * 2.0);
+    } else {
+        col = mix(uColorMid, uColorHigh, h * 2.0 - 1.0);
+    }
+    fragColor = vec4(col, 1.0);
 }`,
     },
 ];

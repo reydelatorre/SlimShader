@@ -127,7 +127,7 @@ function UniformRow({
     }
 
     return (
-        <div className="group flex flex-col gap-1.5 px-3 py-2 border-b border-border last:border-0">
+        <div className="flex flex-col gap-1.5 px-3 py-2 border-b border-border last:border-0">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <span className="text-accent-bright text-xs font-medium">{uniform.name}</span>
@@ -147,7 +147,7 @@ function UniformRow({
                     )}
                     <button
                         onClick={() => onRemove(uniform.name)}
-                        className="opacity-0 group-hover:opacity-100 text-surface-4 hover:text-red-400 text-[10px] transition-all"
+                        className="cursor-pointer text-[10px] px-1.5 py-0.5 bg-surface-3 hover:bg-red-900 text-surface-4 hover:text-red-400 border border-border hover:border-red-800 transition-all"
                     >
                         remove
                     </button>
@@ -209,34 +209,36 @@ export function UniformsPanel({ uniforms, onAdd, onUpdate, onRemove, onValueChan
                 <p className="text-[10px] text-surface-4 uppercase tracking-widest mb-2">
                     Uniforms
                 </p>
-                <div className="flex gap-1.5">
-                    <input
-                        type="text"
-                        placeholder="name"
-                        value={name}
-                        onChange={(e) => {
-                            setName(e.target.value);
-                            setAddError("");
-                        }}
-                        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                        className="flex-1 bg-surface-3 text-white text-xs px-2 py-1 border border-border placeholder:text-surface-4 focus:outline-none focus:border-accent"
-                    />
-                    <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value as UniformType)}
-                        className="bg-surface-3 text-white text-xs px-1 py-1 border border-border focus:outline-none focus:border-accent"
-                    >
-                        {TYPE_OPTIONS.map((t) => (
-                            <option key={t} value={t}>
-                                {t}
-                            </option>
-                        ))}
-                    </select>
+                <div className="flex flex-col gap-1.5">
+                    <div className="flex gap-1.5">
+                        <input
+                            type="text"
+                            placeholder="new uniform name"
+                            value={name}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                setAddError("");
+                            }}
+                            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                            className="flex-1 min-w-0 bg-surface-3 text-white text-xs px-2 py-1 border border-border placeholder:text-surface-4 focus:outline-none focus:border-accent"
+                        />
+                        <select
+                            value={type}
+                            onChange={(e) => setType(e.target.value as UniformType)}
+                            className="flex-shrink-0 bg-surface-3 text-white text-xs px-1 py-1 border border-border focus:outline-none focus:border-accent"
+                        >
+                            {TYPE_OPTIONS.map((t) => (
+                                <option key={t} value={t}>
+                                    {t}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     <button
                         onClick={handleAdd}
-                        className="px-2 py-1 bg-accent hover:bg-accent-bright text-white text-xs transition-colors"
+                        className="w-full py-1 bg-accent hover:bg-accent-bright text-white text-xs transition-colors"
                     >
-                        +
+                        Add Uniform
                     </button>
                 </div>
                 {addError && <p className="text-red-400 text-[10px] mt-1">{addError}</p>}
