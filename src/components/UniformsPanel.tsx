@@ -86,7 +86,7 @@ function UniformRow({
                         value={v}
                         step={uniform.step ?? (uniform.type === "int" ? 1 : 0.01)}
                         onChange={(e) => onValueChange(uniform.name, parseFloat(e.target.value))}
-                        className="w-16 bg-surface-3 text-white text-xs px-1 py-0.5 rounded border border-border text-right"
+                        className="w-16 bg-surface-3 text-white text-xs px-1 py-0.5 border border-border text-right"
                     />
                 </div>
             );
@@ -107,7 +107,7 @@ function UniformRow({
                                     next[i] = parseFloat(e.target.value);
                                     onValueChange(uniform.name, next);
                                 }}
-                                className="w-full bg-surface-3 text-white text-xs px-1 py-0.5 rounded border border-border text-right"
+                                className="w-full bg-surface-3 text-white text-xs px-1 py-0.5 border border-border text-right"
                             />
                         </div>
                     ))}
@@ -143,7 +143,7 @@ function UniformRow({
                             onChange={(e) =>
                                 onUpdate(uniform.name, { min: parseFloat(e.target.value) })
                             }
-                            className="w-12 bg-surface-3 text-white px-1 py-0.5 rounded border border-border text-right"
+                            className="w-12 bg-surface-3 text-white px-1 py-0.5 border border-border text-right"
                         />
                     </label>
                     <label className="flex items-center gap-1">
@@ -155,7 +155,7 @@ function UniformRow({
                             onChange={(e) =>
                                 onUpdate(uniform.name, { max: parseFloat(e.target.value) })
                             }
-                            className="w-12 bg-surface-3 text-white px-1 py-0.5 rounded border border-border text-right"
+                            className="w-12 bg-surface-3 text-white px-1 py-0.5 border border-border text-right"
                         />
                     </label>
                 </div>
@@ -197,12 +197,12 @@ export function UniformsPanel({ uniforms, onAdd, onUpdate, onRemove, onValueChan
                             setAddError("");
                         }}
                         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                        className="flex-1 bg-surface-3 text-white text-xs px-2 py-1 rounded border border-border placeholder:text-surface-4 focus:outline-none focus:border-accent"
+                        className="flex-1 bg-surface-3 text-white text-xs px-2 py-1 border border-border placeholder:text-surface-4 focus:outline-none focus:border-accent"
                     />
                     <select
                         value={type}
                         onChange={(e) => setType(e.target.value as UniformType)}
-                        className="bg-surface-3 text-white text-xs px-1 py-1 rounded border border-border focus:outline-none focus:border-accent"
+                        className="bg-surface-3 text-white text-xs px-1 py-1 border border-border focus:outline-none focus:border-accent"
                     >
                         {TYPE_OPTIONS.map((t) => (
                             <option key={t} value={t}>
@@ -212,7 +212,7 @@ export function UniformsPanel({ uniforms, onAdd, onUpdate, onRemove, onValueChan
                     </select>
                     <button
                         onClick={handleAdd}
-                        className="px-2 py-1 bg-accent hover:bg-accent-bright text-white text-xs rounded transition-colors"
+                        className="px-2 py-1 bg-accent hover:bg-accent-bright text-white text-xs transition-colors"
                     >
                         +
                     </button>

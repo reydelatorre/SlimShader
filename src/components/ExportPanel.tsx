@@ -53,7 +53,7 @@ export function ExportPanel({ shader }: Props) {
                 </p>
                 <button
                     onClick={handleDownloadZip}
-                    className="w-full px-3 py-1.5 bg-accent hover:bg-accent-bright text-white text-xs rounded transition-colors font-medium"
+                    className="w-full px-3 py-1.5 bg-accent hover:bg-accent-bright text-white text-xs transition-colors font-medium"
                 >
                     Download .zip
                 </button>
@@ -78,7 +78,7 @@ export function ExportPanel({ shader }: Props) {
             <div className="flex-1 relative overflow-hidden">
                 <button
                     onClick={() => handleCopy(TAB_CONTENT[tab], tab === "glsl" ? "glsl" : "lua")}
-                    className="absolute top-2 right-2 z-10 text-[10px] text-surface-4 hover:text-white bg-surface-3 px-2 py-0.5 rounded border border-border transition-colors"
+                    className="absolute top-2 right-2 z-10 text-[10px] text-surface-4 hover:text-white bg-surface-3 px-2 py-0.5 border border-border transition-colors"
                 >
                     {copied ? "copied!" : "copy"}
                 </button>

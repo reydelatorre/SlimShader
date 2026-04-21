@@ -81,7 +81,7 @@ function GalleryPage() {
                         {shaders.map((s) => (
                             <div
                                 key={s.id}
-                                className="group bg-surface-1 border border-border rounded-lg overflow-hidden flex flex-col"
+                                className="group bg-surface-1 border border-border overflow-hidden flex flex-col"
                             >
                                 <ShaderThumb
                                     fragmentSource={s.fragmentSource}
@@ -95,7 +95,7 @@ function GalleryPage() {
                                         </span>
                                         <button
                                             onClick={() => handleFork(s)}
-                                            className="text-[10px] px-2 py-1 border border-border rounded text-surface-4 hover:border-accent-bright hover:text-accent-bright transition-colors"
+                                            className="text-[10px] px-2 py-1 border border-border text-surface-4 hover:border-accent-bright hover:text-accent-bright transition-colors"
                                         >
                                             fork →
                                         </button>

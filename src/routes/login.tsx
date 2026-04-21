@@ -49,9 +49,9 @@ function LoginPage() {
                     <p className="text-surface-4 text-xs mt-2">GLSL editor + Love2D exporter</p>
                 </div>
 
-                <div className="bg-surface-1 border border-border rounded-lg p-6 flex flex-col gap-5">
+                <div className="bg-surface-1 border border-border p-6 flex flex-col gap-5">
                     {/* Mode toggle */}
-                    <div className="flex rounded overflow-hidden border border-border">
+                    <div className="flex overflow-hidden border border-border">
                         {(["signin", "signup"] as Mode[]).map((m) => (
                             <button
                                 key={m}
@@ -78,7 +78,7 @@ function LoginPage() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="bg-surface-2 border border-border rounded px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
+                            className="bg-surface-2 border border-border px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
                         />
                         <input
                             type="password"
@@ -86,7 +86,7 @@ function LoginPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="bg-surface-2 border border-border rounded px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
+                            className="bg-surface-2 border border-border px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
                         />
 
                         {error && (
@@ -99,7 +99,7 @@ function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="mt-1 py-2 bg-accent hover:bg-accent-bright disabled:opacity-50 text-white rounded text-xs font-medium transition-colors"
+                            className="mt-1 py-2 bg-accent hover:bg-accent-bright disabled:opacity-50 text-white text-xs font-medium transition-colors"
                         >
                             {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
                         </button>

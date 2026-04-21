@@ -28,7 +28,7 @@ export function ShaderThumb({ fragmentSource, uniforms }: Props) {
             ref={canvasRef}
             width={THUMB_W}
             height={THUMB_H}
-            className="w-full rounded-t-lg"
+            className="w-full"
             style={{ display: "block", aspectRatio: "16/9" }}
         />
     );

@@ -63,7 +63,7 @@ function HomePage() {
 
                 <button
                     onClick={handleNew}
-                    className="px-6 py-3 bg-accent hover:bg-accent-bright text-white rounded text-sm font-medium transition-colors"
+                    className="px-6 py-3 bg-accent hover:bg-accent-bright text-white text-sm font-medium transition-colors"
                 >
                     + New Shader
                 </button>
@@ -78,11 +78,11 @@ function HomePage() {
                             <button
                                 key={toy.name}
                                 onClick={() => handleOpenToy(i)}
-                                className="group text-left bg-surface-1 border border-border rounded-lg p-4 hover:border-[var(--toy-color)] transition-colors"
+                                className="group text-left bg-surface-1 border border-border p-4 hover:border-[var(--toy-color)] transition-colors"
                                 style={{ "--toy-color": toy.color } as React.CSSProperties}
                             >
                                 <div
-                                    className="w-2 h-2 rounded-full mb-3"
+                                    className="w-2 h-2 mb-3"
                                     style={{ background: toy.color }}
                                 />
                                 <p className="text-white text-xs font-medium mb-1 group-hover:text-[var(--toy-color)] transition-colors">
@@ -106,7 +106,7 @@ function HomePage() {
                             {shaders.map((s) => (
                                 <div
                                     key={s.id}
-                                    className="flex items-center justify-between bg-surface-2 border border-border rounded px-4 py-3 group"
+                                    className="flex items-center justify-between bg-surface-2 border border-border px-4 py-3 group"
                                 >
                                     <button
                                         onClick={() => handleOpen(s.id)}
