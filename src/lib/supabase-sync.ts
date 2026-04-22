@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { ShaderEntry, ShaderUniform } from "./shader-store";
+import type { ShaderEntry, ShaderUniform, ShaderPass } from "./shader-store";
 
 interface ShaderRow {
     id: string;
@@ -7,6 +7,9 @@ interface ShaderRow {
     name: string;
     fragment_source: string;
     uniforms: ShaderUniform[];
+    passes: ShaderPass[];
+    blend_mode: string;
+    blend_opacity: number;
     published: boolean;
     created_at: string;
     updated_at: string;
@@ -19,6 +22,9 @@ function toRow(entry: ShaderEntry, userId: string): Omit<ShaderRow, "created_at"
         name: entry.name,
         fragment_source: entry.fragmentSource,
         uniforms: entry.uniforms,
+        passes: entry.passes ?? [],
+        blend_mode: entry.blendMode ?? "replace",
+        blend_opacity: entry.blendOpacity ?? 1,
         published: entry.published,
     };
 }
@@ -28,7 +34,14 @@ export function rowToEntry(row: ShaderRow): ShaderEntry {
         id: row.id,
         name: row.name,
         fragmentSource: row.fragment_source,
-        uniforms: row.uniforms,
+        uniforms: row.uniforms ?? [],
+        passes: (row.passes ?? []).map((p) =>
+            typeof p === "string"
+                ? { id: p, blendMode: "replace" as const, opacity: 1 }
+                : p
+        ),
+        blendMode: (row.blend_mode as ShaderEntry["blendMode"]) ?? "replace",
+        blendOpacity: row.blend_opacity ?? 1,
         published: row.published,
         createdAt: new Date(row.created_at).getTime(),
         updatedAt: new Date(row.updated_at).getTime(),

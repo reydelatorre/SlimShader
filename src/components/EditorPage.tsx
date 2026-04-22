@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "@tanstack/react-router";
 import { useShaderStore } from "../lib/shader-store";
 import { supabase } from "../lib/supabase";
@@ -25,6 +25,7 @@ export function EditorPage() {
     const addPass = useShaderStore((s) => s.addPass);
     const removePass = useShaderStore((s) => s.removePass);
     const reorderPass = useShaderStore((s) => s.reorderPass);
+    const updatePass = useShaderStore((s) => s.updatePass);
 
     const [localSource, setLocalSource] = useState(shader?.fragmentSource ?? "");
     const [error, setError] = useState<RendererError | null>(null);
@@ -73,12 +74,19 @@ export function EditorPage() {
 
     const uniforms = shader.uniforms;
 
-    // Build ordered PassInfo list: resolved pre-passes + current shader last
-    const passPasses: PassInfo[] = shader.passes
-        .map((id) => allShaders.find((s) => s.id === id))
-        .filter(Boolean)
-        .map((s) => ({ source: s!.fragmentSource, uniforms: s!.uniforms }));
-    const allPasses: PassInfo[] = [...passPasses, { source: localSource, uniforms }];
+    // Build ordered PassInfo list: resolved pre-passes + current shader last.
+    // useMemo keeps the reference stable so ShaderPreview's useEffect only fires when content changes.
+    const allPasses = useMemo<PassInfo[]>(() => {
+        const pre = (shader.passes ?? [])
+            .map((p) => {
+                const s = allShaders.find((sh) => sh.id === p.id);
+                if (!s) return null;
+                return { source: s.fragmentSource, uniforms: s.uniforms, blendMode: p.blendMode, opacity: p.opacity };
+            })
+            .filter(Boolean) as PassInfo[];
+        return [...pre, { source: localSource, uniforms, blendMode: shader.blendMode, opacity: shader.blendOpacity }];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [shader.passes, shader.blendMode, shader.blendOpacity, allShaders, localSource, uniforms]);
 
     return (
         <div className="h-screen flex flex-col bg-surface-0 overflow-hidden">
@@ -194,6 +202,7 @@ export function EditorPage() {
                         {rightPanel === "uniforms" && (
                             <UniformsPanel
                                 uniforms={uniforms}
+                                fragmentSource={localSource}
                                 onAdd={(u) => addUniform(shaderId, u)}
                                 onUpdate={(name, patch) => updateUniform(shaderId, name, patch)}
                                 onRemove={(name) => removeUniform(shaderId, name)}
@@ -204,10 +213,14 @@ export function EditorPage() {
                             <PassesPanel
                                 shaderId={shaderId}
                                 passes={shader.passes}
+                                currentBlendMode={shader.blendMode}
+                                currentOpacity={shader.blendOpacity}
                                 onAdd={(passId) => addPass(shaderId, passId)}
                                 onRemove={(i) => removePass(shaderId, i)}
                                 onMoveUp={(i) => reorderPass(shaderId, i, i - 1)}
                                 onMoveDown={(i) => reorderPass(shaderId, i, i + 1)}
+                                onUpdatePass={(i, patch) => updatePass(shaderId, i, patch)}
+                                onUpdateCurrentBlend={(blendMode, blendOpacity) => updateShader(shaderId, { blendMode, blendOpacity })}
                             />
                         )}
                         {rightPanel === "export" && <ExportPanel shader={shader} />}

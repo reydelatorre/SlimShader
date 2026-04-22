@@ -1,7 +1,6 @@
 import {
     VERTEX_SHADER_SRC,
     FRAGMENT_WRAPPER_PREFIX,
-    FRAGMENT_WRAPPER_SUFFIX,
 } from "./default-shader";
 import type { ShaderUniform } from "./shader-store";
 
@@ -13,6 +12,8 @@ export interface RendererError {
 export interface PassInfo {
     source: string;
     uniforms: ShaderUniform[];
+    blendMode?: "replace" | "add" | "multiply" | "screen" | "mix";
+    opacity?: number;
 }
 
 export interface WebGLRenderer {
@@ -38,20 +39,43 @@ function compileShader(
     return { shader };
 }
 
-function buildFragmentSource(userSource: string, uniforms: ShaderUniform[]): string {
-    const extraUniforms = uniforms
+function blendSuffix(blendMode: PassInfo["blendMode"], opacity: number): string {
+    const op = {
+        replace:  `gl_FragColor = fragColor;`,
+        add:      `gl_FragColor = vec4(clamp(prev.rgb + fragColor.rgb, 0.0, 1.0), fragColor.a);`,
+        multiply: `gl_FragColor = vec4(prev.rgb * fragColor.rgb, fragColor.a);`,
+        screen:   `gl_FragColor = vec4(1.0 - (1.0 - prev.rgb) * (1.0 - fragColor.rgb), fragColor.a);`,
+        mix:      `gl_FragColor = mix(prev, fragColor, ${opacity.toFixed(3)});`,
+    }[blendMode ?? "replace"] ?? `gl_FragColor = fragColor;`;
+
+    return `
+void main() {
+    vec4 fragColor;
+    mainImage(fragColor, gl_FragCoord.xy);
+    vec2 _uv = gl_FragCoord.xy / iResolution.xy;
+    vec4 prev = texture2D(iChannel0, _uv);
+    ${op}
+}`;
+}
+
+function buildFragmentSource(pass: PassInfo): string {
+    const extraUniforms = pass.uniforms
         .filter((u) => u.type !== "sampler2D")
         .map((u) => `uniform ${u.type} ${u.name};`)
         .join("\n");
-    return FRAGMENT_WRAPPER_PREFIX + "\n" + extraUniforms + "\n" + userSource + "\n" + FRAGMENT_WRAPPER_SUFFIX;
+    return (
+        FRAGMENT_WRAPPER_PREFIX + "\n" +
+        extraUniforms + "\n" +
+        pass.source + "\n" +
+        blendSuffix(pass.blendMode, pass.opacity ?? 1)
+    );
 }
 
 function buildProgram(
     gl: WebGLRenderingContext,
-    fragmentSource: string,
-    uniforms: ShaderUniform[]
+    pass: PassInfo
 ): { prog: WebGLProgram; error: null } | { prog: null; error: RendererError } {
-    const full = buildFragmentSource(fragmentSource, uniforms);
+    const full = buildFragmentSource(pass);
     const vertResult = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER_SRC);
     if ("error" in vertResult) return { prog: null, error: { type: "vertex", message: vertResult.error } };
     const fragResult = compileShader(gl, gl.FRAGMENT_SHADER, full);
@@ -110,7 +134,7 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
     if (!gl) return null;
 
     let programs: WebGLProgram[] = [];
-    let passUniforms: ShaderUniform[][] = [];
+    let currentPasses: PassInfo[] = [];
     let fbos: FBO[] = [];
     let fboSize = { w: 0, h: 0 };
     let animFrame = 0;
@@ -192,7 +216,7 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
                 gl!.uniform1i(chanLoc, 0);
             }
 
-            for (const u of passUniforms[i]) sendUniform(gl!, prog, u);
+            for (const u of currentPasses[i].uniforms) sendUniform(gl!, prog, u);
 
             drawQuad(prog);
 
@@ -208,7 +232,7 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
         updatePasses(passes) {
             const newPrograms: WebGLProgram[] = [];
             for (const pass of passes) {
-                const result = buildProgram(gl!, pass.source, pass.uniforms);
+                const result = buildProgram(gl!, pass);
                 if (result.error) {
                     for (const p of newPrograms) gl!.deleteProgram(p);
                     currentError = result.error;
@@ -218,7 +242,7 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
             }
             for (const p of programs) gl!.deleteProgram(p);
             programs = newPrograms;
-            passUniforms = passes.map((p) => p.uniforms);
+            currentPasses = passes;
             currentError = null;
             return null;
         },

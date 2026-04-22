@@ -1,16 +1,15 @@
 import { useEffect, useRef } from "react";
 import { createWebGLRenderer } from "../lib/webgl-renderer";
-import type { ShaderUniform } from "../lib/shader-store";
+import type { PassInfo } from "../lib/webgl-renderer";
 
 interface Props {
-    fragmentSource: string;
-    uniforms: ShaderUniform[];
+    passes: PassInfo[];
 }
 
 const THUMB_W = 320;
 const THUMB_H = 180;
 
-export function ShaderThumb({ fragmentSource, uniforms }: Props) {
+export function ShaderThumb({ passes }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -19,9 +18,9 @@ export function ShaderThumb({ fragmentSource, uniforms }: Props) {
         const renderer = createWebGLRenderer(canvas);
         if (!renderer) return;
         renderer.resize(THUMB_W, THUMB_H);
-        renderer.updatePasses([{ source: fragmentSource, uniforms }]);
+        renderer.updatePasses(passes);
         return () => renderer.destroy();
-    }, [fragmentSource, uniforms]);
+    }, [passes]);
 
     return (
         <canvas

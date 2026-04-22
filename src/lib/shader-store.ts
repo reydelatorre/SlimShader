@@ -4,6 +4,13 @@ import { DEFAULT_FRAGMENT_SHADER } from "./default-shader";
 import { syncEntry, deleteRemoteShader } from "./supabase-sync";
 
 export type UniformType = "float" | "vec2" | "vec3" | "vec4" | "bool" | "int" | "sampler2D";
+export type BlendMode = "replace" | "add" | "multiply" | "screen" | "mix";
+
+export interface ShaderPass {
+    id: string;
+    blendMode: BlendMode;
+    opacity: number;
+}
 
 export interface ShaderUniform {
     name: string;
@@ -20,7 +27,9 @@ export interface ShaderEntry {
     name: string;
     fragmentSource: string;
     uniforms: ShaderUniform[];
-    passes: string[];
+    passes: ShaderPass[];
+    blendMode: BlendMode;
+    blendOpacity: number;
     published: boolean;
     createdAt: number;
     updatedAt: number;
@@ -39,6 +48,7 @@ interface ShaderState {
     addPass: (shaderId: string, passId: string) => void;
     removePass: (shaderId: string, index: number) => void;
     reorderPass: (shaderId: string, from: number, to: number) => void;
+    updatePass: (shaderId: string, index: number, patch: Partial<ShaderPass>) => void;
     seedFromRemote: (entries: ShaderEntry[]) => void;
 }
 
@@ -59,7 +69,9 @@ export const useShaderStore = create<ShaderState>()(
                     name: "Untitled Shader",
                     fragmentSource: DEFAULT_FRAGMENT_SHADER,
                     uniforms: [],
-                    passes: [],
+                    passes: [] as ShaderPass[],
+                    blendMode: "replace",
+                    blendOpacity: 1,
                     published: false,
                     createdAt: now,
                     updatedAt: now,
@@ -157,7 +169,8 @@ export const useShaderStore = create<ShaderState>()(
                 set((s) => ({
                     shaders: s.shaders.map((sh) => {
                         if (sh.id !== shaderId) return sh;
-                        updated = { ...sh, passes: [...sh.passes, passId], updatedAt: Date.now() };
+                        const newPass: ShaderPass = { id: passId, blendMode: "replace", opacity: 1 };
+                        updated = { ...sh, passes: [...(sh.passes ?? []), newPass], updatedAt: Date.now() };
                         return updated;
                     }),
                 }));
@@ -169,7 +182,7 @@ export const useShaderStore = create<ShaderState>()(
                 set((s) => ({
                     shaders: s.shaders.map((sh) => {
                         if (sh.id !== shaderId) return sh;
-                        updated = { ...sh, passes: sh.passes.filter((_, i) => i !== index), updatedAt: Date.now() };
+                        updated = { ...sh, passes: (sh.passes ?? []).filter((_, i) => i !== index), updatedAt: Date.now() };
                         return updated;
                     }),
                 }));
@@ -181,9 +194,25 @@ export const useShaderStore = create<ShaderState>()(
                 set((s) => ({
                     shaders: s.shaders.map((sh) => {
                         if (sh.id !== shaderId) return sh;
-                        const next = [...sh.passes];
-                        next.splice(to, 0, next.splice(from, 1)[0]);
+                        const next = [...(sh.passes ?? [])];
+                        const temp = next[from];
+                        next[from] = next[to];
+                        next[to] = temp;
                         updated = { ...sh, passes: next, updatedAt: Date.now() };
+                        return updated;
+                    }),
+                }));
+                if (updated) syncEntry(updated);
+            },
+
+            updatePass(shaderId, index, patch) {
+                let updated: ShaderEntry | undefined;
+                set((s) => ({
+                    shaders: s.shaders.map((sh) => {
+                        if (sh.id !== shaderId) return sh;
+                        const passes = [...(sh.passes ?? [])];
+                        passes[index] = { ...passes[index], ...patch };
+                        updated = { ...sh, passes, updatedAt: Date.now() };
                         return updated;
                     }),
                 }));
@@ -196,7 +225,14 @@ export const useShaderStore = create<ShaderState>()(
                     for (const remote of entries) {
                         const local = map.get(remote.id);
                         if (!local || remote.updatedAt > local.updatedAt) {
-                            map.set(remote.id, remote);
+                            map.set(remote.id, {
+                                ...remote,
+                                // Preserve local values for fields that may not have synced yet
+                                // (clock-skew can cause a stale remote entry to win the merge).
+                                passes: remote.passes?.length ? remote.passes : (local?.passes ?? []),
+                                blendMode: remote.blendMode !== "replace" ? remote.blendMode : (local?.blendMode ?? "replace"),
+                                blendOpacity: remote.blendOpacity !== 1 ? remote.blendOpacity : (local?.blendOpacity ?? 1),
+                            });
                         }
                     }
                     return {
@@ -207,14 +243,31 @@ export const useShaderStore = create<ShaderState>()(
         }),
         {
             name: "slimshader-store",
-            version: 2,
+            version: 4,
             migrate(state: unknown, version: number) {
                 const s = state as { shaders: ShaderEntry[] };
                 if (version === 0) {
                     s.shaders = s.shaders.map((sh) => ({ ...sh, published: sh.published ?? false }));
                 }
                 if (version <= 1) {
-                    s.shaders = s.shaders.map((sh) => ({ ...sh, passes: sh.passes ?? [] }));
+                    s.shaders = s.shaders.map((sh) => ({ ...sh, passes: [] as ShaderPass[] }));
+                }
+                if (version <= 2) {
+                    s.shaders = s.shaders.map((sh) => ({
+                        ...sh,
+                        passes: (sh.passes ?? []).map((p: unknown) =>
+                            typeof p === "string"
+                                ? { id: p, blendMode: "replace" as BlendMode, opacity: 1 }
+                                : p as ShaderPass
+                        ),
+                    }));
+                }
+                if (version <= 3) {
+                    s.shaders = s.shaders.map((sh) => ({
+                        ...sh,
+                        blendMode: (sh as ShaderEntry).blendMode ?? "replace",
+                        blendOpacity: (sh as ShaderEntry).blendOpacity ?? 1,
+                    }));
                 }
                 return s;
             },

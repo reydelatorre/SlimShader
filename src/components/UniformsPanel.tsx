@@ -4,6 +4,7 @@ import { ColorPicker } from "./ColorPicker";
 
 interface Props {
     uniforms: ShaderUniform[];
+    fragmentSource: string;
     onAdd: (u: ShaderUniform) => void;
     onUpdate: (name: string, patch: Partial<ShaderUniform>) => void;
     onRemove: (name: string) => void;
@@ -45,11 +46,17 @@ function vecComponents(type: UniformType): string[] {
 
 function UniformRow({
     uniform,
+    fragmentSource,
+    pendingRemove,
+    setPendingRemove,
     onUpdate,
     onRemove,
     onValueChange,
 }: {
     uniform: ShaderUniform;
+    fragmentSource: string;
+    pendingRemove: string | null;
+    setPendingRemove: (name: string | null) => void;
     onUpdate: (name: string, patch: Partial<ShaderUniform>) => void;
     onRemove: (name: string) => void;
     onValueChange: (name: string, value: number | number[] | boolean) => void;
@@ -145,12 +152,33 @@ function UniformRow({
                             <span className="text-surface-4 text-[10px]">color</span>
                         </label>
                     )}
-                    <button
-                        onClick={() => onRemove(uniform.name)}
-                        className="cursor-pointer text-[10px] px-1.5 py-0.5 bg-surface-3 hover:bg-red-900 text-surface-4 hover:text-red-400 border border-border hover:border-red-800 transition-all"
-                    >
-                        remove
-                    </button>
+                    {pendingRemove === uniform.name ? (
+                        <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-yellow-400">still in shader —</span>
+                            <button
+                                onClick={() => { onRemove(uniform.name); setPendingRemove(null); }}
+                                className="cursor-pointer text-[10px] px-1.5 py-0.5 bg-red-900 text-red-400 border border-red-800"
+                            >confirm</button>
+                            <button
+                                onClick={() => setPendingRemove(null)}
+                                className="cursor-pointer text-[10px] px-1.5 py-0.5 bg-surface-3 text-surface-4 border border-border"
+                            >cancel</button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                const used = new RegExp(`\\b${uniform.name}\\b`).test(fragmentSource);
+                                if (used) {
+                                    setPendingRemove(uniform.name);
+                                } else {
+                                    onRemove(uniform.name);
+                                }
+                            }}
+                            className="cursor-pointer text-[10px] px-1.5 py-0.5 bg-surface-3 hover:bg-red-900 text-surface-4 hover:text-red-400 border border-border hover:border-red-800 transition-all"
+                        >
+                            remove
+                        </button>
+                    )}
                 </div>
             </div>
             <div className="flex items-center gap-2">{renderControl()}</div>
@@ -186,10 +214,11 @@ function UniformRow({
     );
 }
 
-export function UniformsPanel({ uniforms, onAdd, onUpdate, onRemove, onValueChange }: Props) {
+export function UniformsPanel({ uniforms, fragmentSource, onAdd, onUpdate, onRemove, onValueChange }: Props) {
     const [name, setName] = useState("");
     const [type, setType] = useState<UniformType>("float");
     const [addError, setAddError] = useState("");
+    const [pendingRemove, setPendingRemove] = useState<string | null>(null);
 
     function handleAdd() {
         const trimmed = name.trim();
@@ -254,6 +283,9 @@ export function UniformsPanel({ uniforms, onAdd, onUpdate, onRemove, onValueChan
                         <UniformRow
                             key={u.name}
                             uniform={u}
+                            fragmentSource={fragmentSource}
+                            pendingRemove={pendingRemove}
+                            setPendingRemove={setPendingRemove}
                             onUpdate={onUpdate}
                             onRemove={onRemove}
                             onValueChange={onValueChange}

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useShaderStore } from "../lib/shader-store";
 import { SHADER_TOYS } from "../lib/shader-toys";
 import { Logo } from "../components/Logo";
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/")({
 function HomePage() {
     const navigate = useNavigate();
     const { shaders, createShader, updateShader, deleteShader } = useShaderStore();
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     function handleNew() {
         const id = createShader();
@@ -119,7 +121,7 @@ function HomePage() {
                                             {new Date(s.updatedAt).toLocaleDateString()}
                                         </span>
                                         <button
-                                            onClick={() => deleteShader(s.id)}
+                                            onClick={() => setDeleteConfirmId(s.id)}
                                             className="opacity-0 group-hover:opacity-100 text-surface-4 hover:text-red-400 transition-all text-xs"
                                         >
                                             delete
@@ -131,6 +133,41 @@ function HomePage() {
                     </div>
                 )}
             </main>
+
+            {deleteConfirmId && (() => {
+                const target = shaders.find((s) => s.id === deleteConfirmId);
+                if (!target) return null;
+                return (
+                    <div
+                        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+                        onClick={() => setDeleteConfirmId(null)}
+                    >
+                        <div
+                            className="bg-surface-1 border border-border p-6 flex flex-col gap-4 w-80"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <p className="text-white text-sm font-medium">Delete shader?</p>
+                            <p className="text-surface-4 text-xs leading-relaxed">
+                                <span className="text-white">{target.name}</span> will be permanently deleted.
+                            </p>
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    className="px-3 py-1.5 text-xs text-surface-4 border border-border hover:text-white transition-colors"
+                                >
+                                    cancel
+                                </button>
+                                <button
+                                    onClick={() => { deleteShader(deleteConfirmId); setDeleteConfirmId(null); }}
+                                    className="px-3 py-1.5 text-xs bg-red-900 hover:bg-red-800 text-red-400 border border-red-800 transition-colors"
+                                >
+                                    delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
