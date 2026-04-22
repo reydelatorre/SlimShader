@@ -14,7 +14,10 @@ export interface RendererError {
 export interface PassInfo {
     source: string;
     uniforms: ShaderUniform[];
-    blendMode?: "replace" | "add" | "multiply" | "screen" | "mix";
+    blendMode?: "replace" | "mix"
+        | "add" | "subtract" | "difference"
+        | "multiply" | "screen" | "overlay" | "soft-light" | "hard-light"
+        | "darken" | "lighten" | "color-dodge" | "color-burn";
     opacity?: number;
 }
 
@@ -46,13 +49,23 @@ function compileShader(
 }
 
 function blendSuffix(blendMode: PassInfo["blendMode"], opacity: number): string {
-    const op = {
-        replace:  `_slimOut = fragColor;`,
-        add:      `_slimOut = vec4(clamp(prev.rgb + fragColor.rgb, 0.0, 1.0), fragColor.a);`,
-        multiply: `_slimOut = vec4(prev.rgb * fragColor.rgb, fragColor.a);`,
-        screen:   `_slimOut = vec4(1.0 - (1.0 - prev.rgb) * (1.0 - fragColor.rgb), fragColor.a);`,
-        mix:      `_slimOut = mix(prev, fragColor, ${opacity.toFixed(3)});`,
-    }[blendMode ?? "replace"] ?? `_slimOut = fragColor;`;
+    const ops: Record<string, string> = {
+        "replace":     `_slimOut = fragColor;`,
+        "mix":         `_slimOut = mix(prev, fragColor, ${opacity.toFixed(3)});`,
+        "add":         `_slimOut = vec4(clamp(prev.rgb + fragColor.rgb, 0.0, 1.0), fragColor.a);`,
+        "subtract":    `_slimOut = vec4(clamp(prev.rgb - fragColor.rgb, 0.0, 1.0), fragColor.a);`,
+        "difference":  `_slimOut = vec4(abs(prev.rgb - fragColor.rgb), fragColor.a);`,
+        "multiply":    `_slimOut = vec4(prev.rgb * fragColor.rgb, fragColor.a);`,
+        "screen":      `_slimOut = vec4(1.0 - (1.0 - prev.rgb) * (1.0 - fragColor.rgb), fragColor.a);`,
+        "overlay":     `{ vec3 _b = step(0.5, prev.rgb); _slimOut = vec4(mix(2.0*prev.rgb*fragColor.rgb, 1.0-2.0*(1.0-prev.rgb)*(1.0-fragColor.rgb), _b), fragColor.a); }`,
+        "soft-light":  `{ vec3 _s = fragColor.rgb; vec3 _d = prev.rgb; _slimOut = vec4(_d + (2.0*_s - 1.0)*(_d - _d*_d), fragColor.a); }`,
+        "hard-light":  `{ vec3 _b = step(0.5, fragColor.rgb); _slimOut = vec4(mix(2.0*prev.rgb*fragColor.rgb, 1.0-2.0*(1.0-prev.rgb)*(1.0-fragColor.rgb), _b), fragColor.a); }`,
+        "darken":      `_slimOut = vec4(min(prev.rgb, fragColor.rgb), fragColor.a);`,
+        "lighten":     `_slimOut = vec4(max(prev.rgb, fragColor.rgb), fragColor.a);`,
+        "color-dodge": `_slimOut = vec4(clamp(prev.rgb / max(1.0 - fragColor.rgb, 0.0001), 0.0, 1.0), fragColor.a);`,
+        "color-burn":  `_slimOut = vec4(clamp(1.0 - (1.0 - prev.rgb) / max(fragColor.rgb, 0.0001), 0.0, 1.0), fragColor.a);`,
+    };
+    const op = ops[blendMode ?? "replace"] ?? `_slimOut = fragColor;`;
 
     return `
 void main() {
@@ -67,6 +80,7 @@ void main() {
 function buildFragmentSource(pass: PassInfo, hasMesh: boolean): string {
     const extraUniforms = pass.uniforms
         .filter((u) => u.type !== "sampler2D")
+        .filter((u) => !new RegExp(`\\buniform\\b[^;]*\\b${u.name}\\b`).test(pass.source))
         .map((u) => `uniform ${u.type === "select" ? "int" : u.type} ${u.name};`)
         .join("\n");
     return (

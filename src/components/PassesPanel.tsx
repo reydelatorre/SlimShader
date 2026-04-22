@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useShaderStore, type BlendMode, type ShaderPass } from "../lib/shader-store";
 
-const BLEND_MODES: BlendMode[] = ["replace", "add", "multiply", "screen", "mix"];
+const BLEND_MODES: BlendMode[] = [
+    "replace", "mix",
+    "add", "subtract", "difference",
+    "multiply", "screen", "overlay", "soft-light", "hard-light",
+    "darken", "lighten", "color-dodge", "color-burn",
+];
 
 interface Props {
     shaderId: string;

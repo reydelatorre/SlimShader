@@ -12,6 +12,8 @@ import { UniformsPanel } from "./UniformsPanel";
 import { PassesPanel } from "./PassesPanel";
 import { ExportPanel } from "./ExportPanel";
 import { MeshPanel } from "./MeshPanel";
+import { EffectLibrary, buildUniformsFromTemplate } from "./EffectLibrary";
+import type { EffectTemplate } from "../lib/default-shader";
 
 const MESH_ENABLED = import.meta.env.VITE_ENABLE_MESH === "true";
 
@@ -40,6 +42,7 @@ export function EditorPage() {
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const captureRef = useRef<(() => string | null) | null>(null);
     const [uniformScopeId, setUniformScopeId] = useState(shaderId);
+    const [showEffectLibrary, setShowEffectLibrary] = useState(false);
 
     // Mesh state (ephemeral — not persisted to store)
     const [meshData, setMeshData] = useState<MeshData | null>(null);
@@ -82,6 +85,16 @@ export function EditorPage() {
         setError(err);
     }, []);
 
+    function handleInsertEffect(template: EffectTemplate) {
+        handleSourceChange(template.source);
+        const newUniforms = buildUniformsFromTemplate(template);
+        const existing = new Set(shader.uniforms.map((u) => u.name));
+        for (const u of newUniforms) {
+            if (!existing.has(u.name)) addUniform(shaderId, u);
+        }
+        setRightPanel("uniforms");
+    }
+
     function handleNameSubmit() {
         setEditingName(false);
         if (nameValue.trim()) updateShader(shaderId, { name: nameValue.trim() });
@@ -108,6 +121,12 @@ export function EditorPage() {
 
     return (
         <div className="h-screen flex flex-col bg-surface-0 overflow-hidden">
+            {showEffectLibrary && (
+                <EffectLibrary
+                    onInsert={handleInsertEffect}
+                    onClose={() => setShowEffectLibrary(false)}
+                />
+            )}
             {/* Toolbar */}
             <header className="flex-shrink-0 h-10 flex items-center gap-3 px-4 border-b border-border bg-surface-1">
                 <Link to="/">
@@ -147,6 +166,13 @@ export function EditorPage() {
                 )}
 
                 <div className="flex-1" />
+
+                <button
+                    onClick={() => setShowEffectLibrary(true)}
+                    className="text-surface-4 text-[10px] hover:text-white border border-border hover:border-surface-4 px-2 py-1 transition-colors"
+                >
+                    + effect
+                </button>
 
                 <button
                     onClick={() => setPublished(shaderId, !shader.published)}

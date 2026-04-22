@@ -4,7 +4,11 @@ import { DEFAULT_FRAGMENT_SHADER } from "./default-shader";
 import { syncEntry, deleteRemoteShader } from "./supabase-sync";
 
 export type UniformType = "float" | "vec2" | "vec3" | "vec4" | "bool" | "int" | "sampler2D" | "select";
-export type BlendMode = "replace" | "add" | "multiply" | "screen" | "mix";
+export type BlendMode =
+    | "replace" | "mix"
+    | "add" | "subtract" | "difference"
+    | "multiply" | "screen" | "overlay" | "soft-light" | "hard-light"
+    | "darken" | "lighten" | "color-dodge" | "color-burn";
 
 export interface ShaderPass {
     id: string;
