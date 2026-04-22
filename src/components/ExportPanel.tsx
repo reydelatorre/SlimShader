@@ -1,4 +1,5 @@
 import { useState } from "react";
+import React from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { ShaderEntry } from "../lib/shader-store";
@@ -11,11 +12,21 @@ import {
 
 interface Props {
     shader: ShaderEntry;
+    captureRef?: React.MutableRefObject<(() => string | null) | null>;
 }
 
-export function ExportPanel({ shader }: Props) {
+export function ExportPanel({ shader, captureRef }: Props) {
     const [copied, setCopied] = useState<"glsl" | "lua" | null>(null);
     const [tab, setTab] = useState<"glsl" | "lua" | "conf">("glsl");
+
+    function handleCapturePng() {
+        const dataUrl = captureRef?.current?.();
+        if (!dataUrl) return;
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${shader.name.replace(/\s+/g, "-")}.png`;
+        a.click();
+    }
 
     const glsl = convertToLove2D(shader);
     const lua = generateMainLua(shader);
@@ -49,14 +60,22 @@ export function ExportPanel({ shader }: Props) {
         <div className="flex flex-col h-full">
             <div className="px-3 py-2 border-b border-border">
                 <p className="text-[10px] text-surface-4 uppercase tracking-widest mb-2">
-                    Love2D Export
+                    Export
                 </p>
-                <button
-                    onClick={handleDownloadZip}
-                    className="w-full px-3 py-1.5 bg-accent hover:bg-accent-bright text-white text-xs transition-colors font-medium"
-                >
-                    Download .zip
-                </button>
+                <div className="flex flex-col gap-1.5">
+                    <button
+                        onClick={handleCapturePng}
+                        className="w-full px-3 py-1.5 bg-surface-2 hover:bg-surface-3 border border-border text-white text-xs transition-colors"
+                    >
+                        Capture Frame (PNG)
+                    </button>
+                    <button
+                        onClick={handleDownloadZip}
+                        className="w-full px-3 py-1.5 bg-accent hover:bg-accent-bright text-white text-xs transition-colors font-medium"
+                    >
+                        Download Love2D .zip
+                    </button>
+                </div>
             </div>
 
             <div className="flex border-b border-border">

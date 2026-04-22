@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { DEFAULT_FRAGMENT_SHADER } from "./default-shader";
 import { syncEntry, deleteRemoteShader } from "./supabase-sync";
 
-export type UniformType = "float" | "vec2" | "vec3" | "vec4" | "bool" | "int" | "sampler2D";
+export type UniformType = "float" | "vec2" | "vec3" | "vec4" | "bool" | "int" | "sampler2D" | "select";
 export type BlendMode = "replace" | "add" | "multiply" | "screen" | "mix";
 
 export interface ShaderPass {
@@ -17,9 +17,15 @@ export interface ShaderUniform {
     type: UniformType;
     value: number | number[] | boolean;
     isColor?: boolean;
+    isXYPad?: boolean;
     min?: number;
     max?: number;
     step?: number;
+    label?: string;
+    description?: string;
+    group?: string;
+    options?: { label: string; value: number }[];
+    visibleWhen?: { key: string; equals: number | boolean };
 }
 
 export interface ShaderEntry {

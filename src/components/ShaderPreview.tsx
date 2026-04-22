@@ -5,6 +5,7 @@ import type { MeshData } from "../lib/obj-loader";
 interface Props {
     passes: PassInfo[];
     onError: (err: RendererError | null) => void;
+    captureRef?: React.MutableRefObject<(() => string | null) | null>;
     meshData?: MeshData | null;
     meshScale?: number;
     meshRotX?: number;
@@ -13,7 +14,7 @@ interface Props {
     wireframe?: number;
 }
 
-export function ShaderPreview({ passes, onError, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0 }: Props) {
+export function ShaderPreview({ passes, onError, captureRef, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0 }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rendererRef = useRef<WebGLRenderer | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -25,8 +26,13 @@ export function ShaderPreview({ passes, onError, meshData, meshScale = 1, meshRo
         const renderer = createWebGLRenderer(canvas);
         if (!renderer) { setSupported(false); return; }
         rendererRef.current = renderer;
-        return () => { renderer.destroy(); rendererRef.current = null; };
-    }, []);
+        if (captureRef) captureRef.current = () => canvas.toDataURL("image/png");
+        return () => {
+            renderer.destroy();
+            rendererRef.current = null;
+            if (captureRef) captureRef.current = null;
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const renderer = rendererRef.current;

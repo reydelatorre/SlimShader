@@ -38,6 +38,7 @@ export function EditorPage() {
     const [editingName, setEditingName] = useState(false);
     const [nameValue, setNameValue] = useState(shader?.name ?? "");
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const captureRef = useRef<(() => string | null) | null>(null);
     const [uniformScopeId, setUniformScopeId] = useState(shaderId);
 
     // Mesh state (ephemeral — not persisted to store)
@@ -189,6 +190,7 @@ export function EditorPage() {
                     <ShaderPreview
                         passes={allPasses}
                         onError={handleError}
+                        captureRef={captureRef}
                         meshData={meshData}
                         meshScale={meshScale}
                         meshRotX={meshRotX}
@@ -294,7 +296,7 @@ export function EditorPage() {
                                 onInsertStarter={() => handleSourceChange(MESH_RAYCAST_STARTER)}
                             />
                         )}
-                        {rightPanel === "export" && <ExportPanel shader={shader} />}
+                        {rightPanel === "export" && <ExportPanel shader={shader} captureRef={captureRef} />}
                     </div>
                 </div>
             </div>

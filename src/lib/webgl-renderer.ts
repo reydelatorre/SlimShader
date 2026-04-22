@@ -67,7 +67,7 @@ void main() {
 function buildFragmentSource(pass: PassInfo, hasMesh: boolean): string {
     const extraUniforms = pass.uniforms
         .filter((u) => u.type !== "sampler2D")
-        .map((u) => `uniform ${u.type} ${u.name};`)
+        .map((u) => `uniform ${u.type === "select" ? "int" : u.type} ${u.name};`)
         .join("\n");
     return (
         FRAGMENT_WRAPPER_PREFIX +
@@ -110,9 +110,10 @@ function sendUniform(gl: WebGL2RenderingContext, prog: WebGLProgram, u: ShaderUn
     if (!loc) return;
     const v = u.value;
     switch (u.type) {
-        case "float": gl.uniform1f(loc, v as number); break;
-        case "int":   gl.uniform1i(loc, v as number); break;
-        case "bool":  gl.uniform1i(loc, (v as boolean) ? 1 : 0); break;
+        case "float":  gl.uniform1f(loc, v as number); break;
+        case "int":    gl.uniform1i(loc, v as number); break;
+        case "select": gl.uniform1i(loc, v as number); break;
+        case "bool":   gl.uniform1i(loc, (v as boolean) ? 1 : 0); break;
         case "vec2":  gl.uniform2fv(loc, v as number[]); break;
         case "vec3":  gl.uniform3fv(loc, v as number[]); break;
         case "vec4":  gl.uniform4fv(loc, v as number[]); break;
@@ -138,7 +139,7 @@ function createFBO(gl: WebGL2RenderingContext, w: number, h: number): FBO {
 }
 
 export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true });
     if (!gl) return null;
 
     let programs: WebGLProgram[] = [];
