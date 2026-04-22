@@ -137,7 +137,7 @@ export function ColorPicker({ value, onChange }: { value: number[]; onChange: (v
                         onMouseDown={onSquare}
                     >
                         <div
-                            className="absolute w-3 h-3 border-2 border-white pointer-events-none"
+                            className="absolute w-3 h-3 border-2 border-white pointer-events-lets none"
                             style={{
                                 left: `${s * 100}%`, top: `${(1 - v) * 100}%`,
                                 transform: "translate(-50%,-50%)",

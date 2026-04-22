@@ -7,7 +7,7 @@ export const Route = createFileRoute("/login")({
     component: LoginPage,
 });
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "forgot";
 
 function LoginPage() {
     const navigate = useNavigate();
@@ -17,6 +17,12 @@ function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+
+    function switchMode(m: Mode) {
+        setMode(m);
+        setError(null);
+        setMessage(null);
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -29,6 +35,12 @@ function LoginPage() {
                 const { error } = await supabase.auth.signUp({ email, password });
                 if (error) throw error;
                 setMessage("Check your email for a confirmation link.");
+            } else if (mode === "forgot") {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/reset-password`,
+                });
+                if (error) throw error;
+                setMessage("Password reset email sent — check your inbox.");
             } else {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
@@ -50,26 +62,35 @@ function LoginPage() {
                 </div>
 
                 <div className="bg-surface-1 border border-border p-6 flex flex-col gap-5">
-                    {/* Mode toggle */}
-                    <div className="flex overflow-hidden border border-border">
-                        {(["signin", "signup"] as Mode[]).map((m) => (
+                    {mode !== "forgot" && (
+                        <div className="flex overflow-hidden border border-border">
+                            {(["signin", "signup"] as Mode[]).map((m) => (
+                                <button
+                                    key={m}
+                                    onClick={() => switchMode(m)}
+                                    className={`flex-1 text-[10px] py-2 uppercase tracking-widest transition-colors ${
+                                        mode === m
+                                            ? "bg-surface-2 text-white"
+                                            : "text-surface-4 hover:text-white"
+                                    }`}
+                                >
+                                    {m === "signin" ? "Sign in" : "Sign up"}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {mode === "forgot" && (
+                        <div className="flex items-center gap-2">
                             <button
-                                key={m}
-                                onClick={() => {
-                                    setMode(m);
-                                    setError(null);
-                                    setMessage(null);
-                                }}
-                                className={`flex-1 text-[10px] py-2 uppercase tracking-widest transition-colors ${
-                                    mode === m
-                                        ? "bg-surface-2 text-white"
-                                        : "text-surface-4 hover:text-white"
-                                }`}
+                                onClick={() => switchMode("signin")}
+                                className="text-surface-4 hover:text-white transition-colors text-[10px]"
                             >
-                                {m === "signin" ? "Sign in" : "Sign up"}
+                                ← back
                             </button>
-                        ))}
-                    </div>
+                            <span className="text-surface-4 text-[10px] uppercase tracking-widest">Reset password</span>
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                         <input
@@ -80,29 +101,37 @@ function LoginPage() {
                             required
                             className="bg-surface-2 border border-border px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
                         />
-                        <input
-                            type="password"
-                            placeholder="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            className="bg-surface-2 border border-border px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
-                        />
+                        {mode !== "forgot" && (
+                            <input
+                                type="password"
+                                placeholder="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                className="bg-surface-2 border border-border px-3 py-2 text-white text-xs placeholder:text-surface-4 focus:outline-none focus:border-accent-bright"
+                            />
+                        )}
 
-                        {error && (
-                            <p className="text-red-400 text-[10px] leading-relaxed">{error}</p>
-                        )}
-                        {message && (
-                            <p className="text-green-400 text-[10px] leading-relaxed">{message}</p>
-                        )}
+                        {error && <p className="text-red-400 text-[10px] leading-relaxed">{error}</p>}
+                        {message && <p className="text-green-400 text-[10px] leading-relaxed">{message}</p>}
 
                         <button
                             type="submit"
                             disabled={loading}
                             className="mt-1 py-2 bg-accent hover:bg-accent-bright disabled:opacity-50 text-white text-xs font-medium transition-colors"
                         >
-                            {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
+                            {loading ? "…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset email"}
                         </button>
+
+                        {mode === "signin" && (
+                            <button
+                                type="button"
+                                onClick={() => switchMode("forgot")}
+                                className="text-surface-4 hover:text-white text-[10px] transition-colors text-center"
+                            >
+                                Forgot password?
+                            </button>
+                        )}
                     </form>
                 </div>
             </div>

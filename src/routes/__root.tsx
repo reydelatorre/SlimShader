@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { fetchRemoteShaders, upsertShader } from "../lib/supabase-sync";
 import { useShaderStore } from "../lib/shader-store";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/reset-password"];
 
 function RootLayout() {
     const navigate = useNavigate();
@@ -26,6 +26,9 @@ function RootLayout() {
         } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === "SIGNED_OUT") {
                 navigate({ to: "/login" });
+            }
+            if (event === "PASSWORD_RECOVERY") {
+                navigate({ to: "/reset-password" });
             }
             if (event === "SIGNED_IN" && session) {
                 runSync();
