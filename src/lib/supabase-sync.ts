@@ -28,6 +28,7 @@ export interface GalleryEntry extends ShaderEntry {
 // GalleryEntry plus resolved pass dependency shaders for the detail page
 export interface ShaderDetail extends GalleryEntry {
     passDeps: ShaderEntry[];
+    userId: string;
 }
 
 function toRow(entry: ShaderEntry, userId: string): Omit<ShaderRow, "created_at" | "updated_at"> {
@@ -121,7 +122,7 @@ export async function fetchShaderById(id: string): Promise<ShaderDetail | null> 
 
     const username = (profileData as ProfileRow | null)?.username ?? null;
 
-    return { ...rowToEntry(row), username, passDeps };
+    return { ...rowToEntry(row), username, passDeps, userId: row.user_id };
 }
 
 export async function fetchPublishedShaders(): Promise<GalleryEntry[]> {

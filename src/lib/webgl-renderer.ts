@@ -1,8 +1,10 @@
 import {
     VERTEX_SHADER_SRC,
     FRAGMENT_WRAPPER_PREFIX,
+    MESH_FRAGMENT_PREFIX,
 } from "./default-shader";
 import type { ShaderUniform } from "./shader-store";
+import type { MeshData } from "./obj-loader";
 
 export interface RendererError {
     type: "vertex" | "fragment" | "link";
@@ -18,13 +20,17 @@ export interface PassInfo {
 
 export interface WebGLRenderer {
     updatePasses: (passes: PassInfo[]) => RendererError | null;
+    setMesh: (data: MeshData) => void;
+    clearMesh: () => void;
+    setMeshTransform: (scale: number, rotX: number, rotY: number, rotZ: number) => void;
+    setWireframe: (mode: number) => void;
     resize: (w: number, h: number) => void;
     destroy: () => void;
     getError: () => RendererError | null;
 }
 
 function compileShader(
-    gl: WebGLRenderingContext,
+    gl: WebGL2RenderingContext,
     type: number,
     src: string
 ): { shader: WebGLShader } | { error: string } {
@@ -41,30 +47,31 @@ function compileShader(
 
 function blendSuffix(blendMode: PassInfo["blendMode"], opacity: number): string {
     const op = {
-        replace:  `gl_FragColor = fragColor;`,
-        add:      `gl_FragColor = vec4(clamp(prev.rgb + fragColor.rgb, 0.0, 1.0), fragColor.a);`,
-        multiply: `gl_FragColor = vec4(prev.rgb * fragColor.rgb, fragColor.a);`,
-        screen:   `gl_FragColor = vec4(1.0 - (1.0 - prev.rgb) * (1.0 - fragColor.rgb), fragColor.a);`,
-        mix:      `gl_FragColor = mix(prev, fragColor, ${opacity.toFixed(3)});`,
-    }[blendMode ?? "replace"] ?? `gl_FragColor = fragColor;`;
+        replace:  `_slimOut = fragColor;`,
+        add:      `_slimOut = vec4(clamp(prev.rgb + fragColor.rgb, 0.0, 1.0), fragColor.a);`,
+        multiply: `_slimOut = vec4(prev.rgb * fragColor.rgb, fragColor.a);`,
+        screen:   `_slimOut = vec4(1.0 - (1.0 - prev.rgb) * (1.0 - fragColor.rgb), fragColor.a);`,
+        mix:      `_slimOut = mix(prev, fragColor, ${opacity.toFixed(3)});`,
+    }[blendMode ?? "replace"] ?? `_slimOut = fragColor;`;
 
     return `
 void main() {
     vec4 fragColor;
     mainImage(fragColor, gl_FragCoord.xy);
     vec2 _uv = gl_FragCoord.xy / iResolution.xy;
-    vec4 prev = texture2D(iChannel0, _uv);
+    vec4 prev = texture(iChannel0, _uv);
     ${op}
 }`;
 }
 
-function buildFragmentSource(pass: PassInfo): string {
+function buildFragmentSource(pass: PassInfo, hasMesh: boolean): string {
     const extraUniforms = pass.uniforms
         .filter((u) => u.type !== "sampler2D")
         .map((u) => `uniform ${u.type} ${u.name};`)
         .join("\n");
     return (
-        FRAGMENT_WRAPPER_PREFIX + "\n" +
+        FRAGMENT_WRAPPER_PREFIX +
+        (hasMesh ? MESH_FRAGMENT_PREFIX : "") + "\n" +
         extraUniforms + "\n" +
         pass.source + "\n" +
         blendSuffix(pass.blendMode, pass.opacity ?? 1)
@@ -72,10 +79,11 @@ function buildFragmentSource(pass: PassInfo): string {
 }
 
 function buildProgram(
-    gl: WebGLRenderingContext,
-    pass: PassInfo
+    gl: WebGL2RenderingContext,
+    pass: PassInfo,
+    hasMesh: boolean
 ): { prog: WebGLProgram; error: null } | { prog: null; error: RendererError } {
-    const full = buildFragmentSource(pass);
+    const full = buildFragmentSource(pass, hasMesh);
     const vertResult = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER_SRC);
     if ("error" in vertResult) return { prog: null, error: { type: "vertex", message: vertResult.error } };
     const fragResult = compileShader(gl, gl.FRAGMENT_SHADER, full);
@@ -97,7 +105,7 @@ function buildProgram(
     return { prog, error: null };
 }
 
-function sendUniform(gl: WebGLRenderingContext, prog: WebGLProgram, u: ShaderUniform) {
+function sendUniform(gl: WebGL2RenderingContext, prog: WebGLProgram, u: ShaderUniform) {
     const loc = gl.getUniformLocation(prog, u.name);
     if (!loc) return;
     const v = u.value;
@@ -113,7 +121,7 @@ function sendUniform(gl: WebGLRenderingContext, prog: WebGLProgram, u: ShaderUni
 
 interface FBO { tex: WebGLTexture; fb: WebGLFramebuffer }
 
-function createFBO(gl: WebGLRenderingContext, w: number, h: number): FBO {
+function createFBO(gl: WebGL2RenderingContext, w: number, h: number): FBO {
     const tex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -130,7 +138,7 @@ function createFBO(gl: WebGLRenderingContext, w: number, h: number): FBO {
 }
 
 export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | null {
-    const gl = canvas.getContext("webgl");
+    const gl = canvas.getContext("webgl2");
     if (!gl) return null;
 
     let programs: WebGLProgram[] = [];
@@ -142,9 +150,24 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
     let mouseX = 0, mouseY = 0, clickX = 0, clickY = 0;
     let currentError: RendererError | null = null;
 
-    // 1×1 black texture fed to pass 0 as iChannel0
+    // Mesh state
+    let meshTex: WebGLTexture | null = null;
+    let meshNumTris = 0;
+    let meshTexHeight = 1;
+    let meshMin: [number, number, number] = [0, 0, 0];
+    let meshRange = 1;
+    let meshScale = 1;
+    let meshRotX = 0, meshRotY = 0, meshRotZ = 0;
+    let wireframeMode = 0;
+
     const blackTex = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, blackTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    const blackMeshTex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, blackMeshTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -185,7 +208,6 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
         const w = canvas.width, h = canvas.height;
         const t = (performance.now() - startTime) / 1000;
 
-        // Ensure we have N-1 FBOs for N passes
         if (programs.length > 1) ensureFBOs(programs.length - 1, w, h);
 
         let prevTex: WebGLTexture = blackTex;
@@ -194,11 +216,7 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
             const prog = programs[i];
             const isLast = i === programs.length - 1;
 
-            if (isLast) {
-                gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
-            } else {
-                gl!.bindFramebuffer(gl!.FRAMEBUFFER, fbos[i].fb);
-            }
+            gl!.bindFramebuffer(gl!.FRAMEBUFFER, isLast ? null : fbos[i].fb);
             gl!.viewport(0, 0, w, h);
             gl!.useProgram(prog);
 
@@ -216,6 +234,31 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
                 gl!.uniform1i(chanLoc, 0);
             }
 
+            const meshLoc = gl!.getUniformLocation(prog, "iMesh");
+            if (meshLoc) {
+                gl!.activeTexture(gl!.TEXTURE1);
+                gl!.bindTexture(gl!.TEXTURE_2D, meshTex ?? blackMeshTex);
+                gl!.uniform1i(meshLoc, 1);
+            }
+            const uMeshMin = gl!.getUniformLocation(prog, "uMeshMin");
+            if (uMeshMin) gl!.uniform3f(uMeshMin, meshMin[0], meshMin[1], meshMin[2]);
+            const uMeshRange = gl!.getUniformLocation(prog, "uMeshRange");
+            if (uMeshRange) gl!.uniform1f(uMeshRange, meshRange);
+            const uMeshHeight = gl!.getUniformLocation(prog, "uMeshHeight");
+            if (uMeshHeight) gl!.uniform1i(uMeshHeight, meshTexHeight);
+            const uNumTris = gl!.getUniformLocation(prog, "uNumTris");
+            if (uNumTris) gl!.uniform1i(uNumTris, meshNumTris);
+            const uMeshScale = gl!.getUniformLocation(prog, "uMeshScale");
+            if (uMeshScale) gl!.uniform1f(uMeshScale, meshScale);
+            const uMeshRotX = gl!.getUniformLocation(prog, "uMeshRotX");
+            if (uMeshRotX) gl!.uniform1f(uMeshRotX, meshRotX);
+            const uMeshRotY = gl!.getUniformLocation(prog, "uMeshRotY");
+            if (uMeshRotY) gl!.uniform1f(uMeshRotY, meshRotY);
+            const uMeshRotZ = gl!.getUniformLocation(prog, "uMeshRotZ");
+            if (uMeshRotZ) gl!.uniform1f(uMeshRotZ, meshRotZ);
+            const uWireframe = gl!.getUniformLocation(prog, "uWireframe");
+            if (uWireframe) gl!.uniform1i(uWireframe, wireframeMode);
+
             for (const u of currentPasses[i].uniforms) sendUniform(gl!, prog, u);
 
             drawQuad(prog);
@@ -228,23 +271,67 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
 
     draw();
 
+    function recompile(hasMesh: boolean): RendererError | null {
+        const newPrograms: WebGLProgram[] = [];
+        for (const pass of currentPasses) {
+            const result = buildProgram(gl!, pass, hasMesh);
+            if (result.error) {
+                for (const p of newPrograms) gl!.deleteProgram(p);
+                currentError = result.error;
+                return result.error;
+            }
+            newPrograms.push(result.prog);
+        }
+        for (const p of programs) gl!.deleteProgram(p);
+        programs = newPrograms;
+        currentError = null;
+        return null;
+    }
+
     return {
         updatePasses(passes) {
-            const newPrograms: WebGLProgram[] = [];
-            for (const pass of passes) {
-                const result = buildProgram(gl!, pass);
-                if (result.error) {
-                    for (const p of newPrograms) gl!.deleteProgram(p);
-                    currentError = result.error;
-                    return result.error;
-                }
-                newPrograms.push(result.prog);
-            }
-            for (const p of programs) gl!.deleteProgram(p);
-            programs = newPrograms;
             currentPasses = passes;
-            currentError = null;
-            return null;
+            return recompile(meshNumTris > 0);
+        },
+
+        setMesh(data) {
+            if (meshTex) { gl!.deleteTexture(meshTex); meshTex = null; }
+            const tex = gl!.createTexture()!;
+            gl!.bindTexture(gl!.TEXTURE_2D, tex);
+            gl!.texImage2D(
+                gl!.TEXTURE_2D, 0, gl!.RGBA,
+                data.texWidth, data.texHeight,
+                0, gl!.RGBA, gl!.UNSIGNED_BYTE, data.pixels
+            );
+            gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_MIN_FILTER, gl!.NEAREST);
+            gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_MAG_FILTER, gl!.NEAREST);
+            gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_WRAP_S, gl!.CLAMP_TO_EDGE);
+            gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_WRAP_T, gl!.CLAMP_TO_EDGE);
+            gl!.bindTexture(gl!.TEXTURE_2D, null);
+            meshTex = tex;
+            meshNumTris = data.numTris;
+            meshTexHeight = data.texHeight;
+            meshMin = data.meshMin;
+            meshRange = data.meshRange;
+            recompile(true);
+        },
+
+        clearMesh() {
+            if (meshTex) { gl!.deleteTexture(meshTex); meshTex = null; }
+            meshNumTris = 0;
+            meshTexHeight = 1;
+            recompile(false);
+        },
+
+        setMeshTransform(scale, rotX, rotY, rotZ) {
+            meshScale = scale;
+            meshRotX = rotX;
+            meshRotY = rotY;
+            meshRotZ = rotZ;
+        },
+
+        setWireframe(mode) {
+            wireframeMode = mode;
         },
 
         resize(w, h) {
@@ -257,6 +344,8 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
             for (const p of programs) gl!.deleteProgram(p);
             for (const { tex, fb } of fbos) { gl!.deleteTexture(tex); gl!.deleteFramebuffer(fb); }
             gl!.deleteTexture(blackTex);
+            gl!.deleteTexture(blackMeshTex);
+            if (meshTex) gl!.deleteTexture(meshTex);
         },
 
         getError() { return currentError; },

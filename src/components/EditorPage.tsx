@@ -4,13 +4,18 @@ import { useShaderStore } from "../lib/shader-store";
 import { supabase } from "../lib/supabase";
 import { Logo } from "./Logo";
 import type { RendererError, PassInfo } from "../lib/webgl-renderer";
+import type { MeshData } from "../lib/obj-loader";
+import { MESH_RAYCAST_STARTER } from "../lib/default-shader";
 import { ShaderPreview } from "./ShaderPreview";
 import { ShaderEditor } from "./ShaderEditor";
 import { UniformsPanel } from "./UniformsPanel";
 import { PassesPanel } from "./PassesPanel";
 import { ExportPanel } from "./ExportPanel";
+import { MeshPanel } from "./MeshPanel";
 
-type RightPanel = "uniforms" | "passes" | "export";
+const MESH_ENABLED = import.meta.env.VITE_ENABLE_MESH === "true";
+
+type RightPanel = "uniforms" | "passes" | "mesh" | "export";
 
 export function EditorPage() {
     const { shaderId } = useParams({ from: "/editor/$shaderId" });
@@ -33,6 +38,14 @@ export function EditorPage() {
     const [editingName, setEditingName] = useState(false);
     const [nameValue, setNameValue] = useState(shader?.name ?? "");
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Mesh state (ephemeral — not persisted to store)
+    const [meshData, setMeshData] = useState<MeshData | null>(null);
+    const [meshScale, setMeshScale] = useState(1);
+    const [meshRotX, setMeshRotX] = useState(0);
+    const [meshRotY, setMeshRotY] = useState(0);
+    const [meshRotZ, setMeshRotZ] = useState(0);
+    const [wireframe, setWireframe] = useState(0);
 
     useEffect(() => {
         if (!shader) navigate({ to: "/" });
@@ -169,7 +182,16 @@ export function EditorPage() {
 
                 {/* Preview */}
                 <div className="w-[40%] flex-shrink-0 border-r border-border flex flex-col">
-                    <ShaderPreview passes={allPasses} onError={handleError} />
+                    <ShaderPreview
+                        passes={allPasses}
+                        onError={handleError}
+                        meshData={meshData}
+                        meshScale={meshScale}
+                        meshRotX={meshRotX}
+                        meshRotY={meshRotY}
+                        meshRotZ={meshRotZ}
+                        wireframe={wireframe}
+                    />
                     {error && (
                         <div className="flex-shrink-0 bg-surface-2 border-t border-red-900 max-h-28 overflow-y-auto">
                             <pre className="text-red-400 text-[10px] p-2 whitespace-pre-wrap leading-relaxed">
@@ -183,7 +205,7 @@ export function EditorPage() {
                 <div className="w-80 flex-shrink-0 flex flex-col">
                     {/* Panel tabs */}
                     <div className="flex border-b border-border flex-shrink-0">
-                        {(["uniforms", "passes", "export"] as RightPanel[]).map((p) => (
+                        {(["uniforms", "passes", ...(MESH_ENABLED ? ["mesh"] : []), "export"] as RightPanel[]).map((p) => (
                             <button
                                 key={p}
                                 onClick={() => setRightPanel(p)}
@@ -193,7 +215,7 @@ export function EditorPage() {
                                         : "text-surface-4 hover:text-white"
                                 }`}
                             >
-                                {p}
+                                {p === "mesh" && meshData ? "mesh ●" : p}
                             </button>
                         ))}
                     </div>
@@ -221,6 +243,24 @@ export function EditorPage() {
                                 onMoveDown={(i) => reorderPass(shaderId, i, i + 1)}
                                 onUpdatePass={(i, patch) => updatePass(shaderId, i, patch)}
                                 onUpdateCurrentBlend={(blendMode, blendOpacity) => updateShader(shaderId, { blendMode, blendOpacity })}
+                            />
+                        )}
+                        {rightPanel === "mesh" && (
+                            <MeshPanel
+                                meshData={meshData}
+                                meshScale={meshScale}
+                                meshRotX={meshRotX}
+                                meshRotY={meshRotY}
+                                meshRotZ={meshRotZ}
+                                wireframe={wireframe}
+                                onMeshLoad={(data) => { setMeshData(data); }}
+                                onMeshClear={() => setMeshData(null)}
+                                onScaleChange={setMeshScale}
+                                onRotXChange={setMeshRotX}
+                                onRotYChange={setMeshRotY}
+                                onRotZChange={setMeshRotZ}
+                                onWireframeChange={setWireframe}
+                                onInsertStarter={() => handleSourceChange(MESH_RAYCAST_STARTER)}
                             />
                         )}
                         {rightPanel === "export" && <ExportPanel shader={shader} />}

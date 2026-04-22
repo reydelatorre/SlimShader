@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { createWebGLRenderer, type WebGLRenderer, type RendererError, type PassInfo } from "../lib/webgl-renderer";
+import type { MeshData } from "../lib/obj-loader";
 
 interface Props {
     passes: PassInfo[];
     onError: (err: RendererError | null) => void;
+    meshData?: MeshData | null;
+    meshScale?: number;
+    meshRotX?: number;
+    meshRotY?: number;
+    meshRotZ?: number;
+    wireframe?: number;
 }
 
-export function ShaderPreview({ passes, onError }: Props) {
+export function ShaderPreview({ passes, onError, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0 }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rendererRef = useRef<WebGLRenderer | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -26,6 +33,21 @@ export function ShaderPreview({ passes, onError }: Props) {
         if (!renderer) return;
         onError(renderer.updatePasses(passes));
     }, [passes, onError]);
+
+    useEffect(() => {
+        const renderer = rendererRef.current;
+        if (!renderer) return;
+        if (meshData) renderer.setMesh(meshData);
+        else renderer.clearMesh();
+    }, [meshData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        rendererRef.current?.setMeshTransform(meshScale, meshRotX, meshRotY, meshRotZ);
+    }, [meshScale, meshRotX, meshRotY, meshRotZ]);
+
+    useEffect(() => {
+        rendererRef.current?.setWireframe(wireframe);
+    }, [wireframe]);
 
     useEffect(() => {
         const container = containerRef.current;

@@ -6,6 +6,7 @@ import type { ShaderEntry } from "../lib/shader-store";
 import type { PassInfo } from "../lib/webgl-renderer";
 import { ShaderPreview } from "../components/ShaderPreview";
 import { Logo } from "../components/Logo";
+import { supabase } from "../lib/supabase";
 
 export const Route = createFileRoute("/shader/$shaderId")({
     component: ShaderDetailPage,
@@ -33,6 +34,13 @@ function ShaderDetailPage() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [rendererError, setRendererError] = useState<import("../lib/webgl-renderer").RendererError | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setCurrentUserId(session?.user.id ?? null);
+        });
+    }, []);
 
     useEffect(() => {
         fetchShaderById(shaderId)
@@ -92,9 +100,9 @@ function ShaderDetailPage() {
                 )}
 
                 {shader && (
-                    <div className="w-full max-w-3xl flex flex-col gap-6">
+                    <div className="w-full max-w-5xl flex flex-col gap-6">
                         {/* Preview */}
-                        <div className="w-full border border-border overflow-hidden" style={{ aspectRatio: "16/9" }}>
+                        <div className="w-full flex border border-border overflow-hidden" style={{ aspectRatio: "16/9" }}>
                             <ShaderPreview passes={passes} onError={setRendererError} />
                         </div>
 
@@ -125,12 +133,23 @@ function ShaderDetailPage() {
                                 </div>
                             </div>
 
-                            <Link
-                                to="/gallery"
-                                className="text-surface-4 text-xs hover:text-white transition-colors"
-                            >
-                                ← gallery
-                            </Link>
+                            <div className="flex items-center gap-4">
+                                {currentUserId && currentUserId === shader.userId && (
+                                    <Link
+                                        to="/editor/$shaderId"
+                                        params={{ shaderId: shader.id }}
+                                        className="px-3 py-1.5 text-xs border border-border text-surface-4 hover:text-white hover:border-surface-4 transition-colors"
+                                    >
+                                        edit
+                                    </Link>
+                                )}
+                                <Link
+                                    to="/gallery"
+                                    className="text-surface-4 text-xs hover:text-white transition-colors"
+                                >
+                                    ← gallery
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 )}
