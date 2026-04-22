@@ -89,8 +89,12 @@ export async function upsertShader(entry: ShaderEntry, userId: string): Promise<
 }
 
 export async function deleteRemoteShader(id: string): Promise<void> {
-    const { error } = await supabase.from("shaders").delete().eq("id", id);
+    const { error, count } = await supabase
+        .from("shaders")
+        .delete({ count: "exact" })
+        .eq("id", id);
     if (error) console.error("[sync] delete failed", error.message);
+    else if (count === 0) console.warn("[sync] delete matched 0 rows — RLS may be blocking it", id);
 }
 
 export async function fetchShaderById(id: string): Promise<ShaderDetail | null> {

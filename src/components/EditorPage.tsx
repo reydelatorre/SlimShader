@@ -38,6 +38,7 @@ export function EditorPage() {
     const [editingName, setEditingName] = useState(false);
     const [nameValue, setNameValue] = useState(shader?.name ?? "");
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [uniformScopeId, setUniformScopeId] = useState(shaderId);
 
     // Mesh state (ephemeral — not persisted to store)
     const [meshData, setMeshData] = useState<MeshData | null>(null);
@@ -58,6 +59,13 @@ export function EditorPage() {
         }
     }, [shaderId]);
 
+    // Reset scope if the selected pass was removed
+    useEffect(() => {
+        if (uniformScopeId === shaderId) return;
+        const valid = (shader?.passes ?? []).some((p) => p.id === uniformScopeId);
+        if (!valid) setUniformScopeId(shaderId);
+    }, [shader?.passes, shaderId, uniformScopeId]);
+
     const handleSourceChange = useCallback(
         (value: string) => {
             setLocalSource(value);
@@ -77,10 +85,6 @@ export function EditorPage() {
         setEditingName(false);
         if (nameValue.trim()) updateShader(shaderId, { name: nameValue.trim() });
         else setNameValue(shader?.name ?? "");
-    }
-
-    function handleUniformValueChange(name: string, value: number | number[] | boolean) {
-        updateUniform(shaderId, name, { value });
     }
 
     if (!shader) return null;
@@ -221,16 +225,43 @@ export function EditorPage() {
                     </div>
 
                     <div className="flex-1 min-h-0">
-                        {rightPanel === "uniforms" && (
-                            <UniformsPanel
-                                uniforms={uniforms}
-                                fragmentSource={localSource}
-                                onAdd={(u) => addUniform(shaderId, u)}
-                                onUpdate={(name, patch) => updateUniform(shaderId, name, patch)}
-                                onRemove={(name) => removeUniform(shaderId, name)}
-                                onValueChange={handleUniformValueChange}
-                            />
-                        )}
+                        {rightPanel === "uniforms" && (() => {
+                            const isCurrentShader = uniformScopeId === shaderId;
+                            const scopeShader = isCurrentShader
+                                ? shader
+                                : allShaders.find((s) => s.id === uniformScopeId) ?? shader;
+                            const passOptions = (shader.passes ?? [])
+                                .map((p) => allShaders.find((s) => s.id === p.id))
+                                .filter(Boolean) as typeof allShaders;
+                            return (
+                                <div className="flex flex-col h-full">
+                                    {passOptions.length > 0 && (
+                                        <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-shrink-0 bg-surface-1">
+                                            <span className="text-surface-4 text-[10px] flex-shrink-0">editing</span>
+                                            <select
+                                                value={uniformScopeId}
+                                                onChange={(e) => setUniformScopeId(e.target.value)}
+                                                className="flex-1 bg-surface-3 text-white text-[10px] px-2 py-1 border border-border focus:outline-none focus:border-accent"
+                                            >
+                                                <option value={shaderId}>{shader.name}</option>
+                                                {passOptions.map((s) => (
+                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <UniformsPanel
+                                        uniforms={scopeShader.uniforms}
+                                        fragmentSource={isCurrentShader ? localSource : scopeShader.fragmentSource}
+                                        scopeNote={!isCurrentShader ? `editing ${scopeShader.name} — changes affect this shader everywhere it's used` : null}
+                                        onAdd={(u) => addUniform(uniformScopeId, u)}
+                                        onUpdate={(name, patch) => updateUniform(uniformScopeId, name, patch)}
+                                        onRemove={(name) => removeUniform(uniformScopeId, name)}
+                                        onValueChange={(name, value) => updateUniform(uniformScopeId, name, { value })}
+                                    />
+                                </div>
+                            );
+                        })()}
                         {rightPanel === "passes" && (
                             <PassesPanel
                                 shaderId={shaderId}

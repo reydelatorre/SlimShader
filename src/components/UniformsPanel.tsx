@@ -275,6 +275,12 @@ export function UniformsPanel({ uniforms, fragmentSource, scopeNote, onAdd, onUp
             </div>
 
             <div className="flex-1 overflow-y-auto">
+                {scopeNote && (
+                    <div className="px-3 py-2 border-b border-border bg-surface-2 flex items-start gap-2">
+                        <span className="text-yellow-400 text-[10px] flex-shrink-0 mt-px">⚠</span>
+                        <p className="text-surface-4 text-[10px] leading-relaxed">{scopeNote}</p>
+                    </div>
+                )}
                 {uniforms.length === 0 ? (
                     <p className="text-surface-4 text-xs px-3 py-4">
                         No custom uniforms. Built-ins always available: iTime, iResolution, iMouse.

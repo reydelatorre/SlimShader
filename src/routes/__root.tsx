@@ -67,10 +67,11 @@ function RootLayout() {
             const userId = session.user.id;
             const remote = await fetchRemoteShaders();
             seedFromRemote(remote);
-            const local = useShaderStore.getState().shaders;
+            const { shaders: local, deletedIds } = useShaderStore.getState();
+            const deleted = new Set(deletedIds);
             const remoteIds = new Set(remote.map((s) => s.id));
             for (const sh of local) {
-                if (!remoteIds.has(sh.id)) await upsertShader(sh, userId);
+                if (!remoteIds.has(sh.id) && !deleted.has(sh.id)) await upsertShader(sh, userId);
             }
         } catch (e) {
             console.error("[sync]", e);

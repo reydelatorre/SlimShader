@@ -37,6 +37,7 @@ export interface ShaderEntry {
 
 interface ShaderState {
     shaders: ShaderEntry[];
+    deletedIds: string[];
     createShader: () => string;
     updateShader: (id: string, patch: Partial<Omit<ShaderEntry, "id" | "createdAt">>) => void;
     deleteShader: (id: string) => void;
@@ -60,6 +61,7 @@ export const useShaderStore = create<ShaderState>()(
     persist(
         (set, get) => ({
             shaders: [],
+            deletedIds: [],
 
             createShader() {
                 const id = makeId();
@@ -94,7 +96,11 @@ export const useShaderStore = create<ShaderState>()(
             },
 
             deleteShader(id) {
-                set((s) => ({ shaders: s.shaders.filter((sh) => sh.id !== id) }));
+                set((s) => ({
+                    shaders: s.shaders.filter((sh) => sh.id !== id),
+                    // Keep last 200 deleted IDs so seedFromRemote never re-adds them
+                    deletedIds: [id, ...s.deletedIds].slice(0, 200),
+                }));
                 deleteRemoteShader(id);
             },
 
@@ -221,14 +227,14 @@ export const useShaderStore = create<ShaderState>()(
 
             seedFromRemote(entries) {
                 set((s) => {
+                    const deleted = new Set(s.deletedIds);
                     const map = new Map(s.shaders.map((sh) => [sh.id, sh]));
                     for (const remote of entries) {
+                        if (deleted.has(remote.id)) continue;
                         const local = map.get(remote.id);
                         if (!local || remote.updatedAt > local.updatedAt) {
                             map.set(remote.id, {
                                 ...remote,
-                                // Preserve local values for fields that may not have synced yet
-                                // (clock-skew can cause a stale remote entry to win the merge).
                                 passes: remote.passes?.length ? remote.passes : (local?.passes ?? []),
                                 blendMode: remote.blendMode !== "replace" ? remote.blendMode : (local?.blendMode ?? "replace"),
                                 blendOpacity: remote.blendOpacity !== 1 ? remote.blendOpacity : (local?.blendOpacity ?? 1),
@@ -243,7 +249,7 @@ export const useShaderStore = create<ShaderState>()(
         }),
         {
             name: "slimshader-store",
-            version: 4,
+            version: 5,
             migrate(state: unknown, version: number) {
                 const s = state as { shaders: ShaderEntry[] };
                 if (version === 0) {
@@ -268,6 +274,9 @@ export const useShaderStore = create<ShaderState>()(
                         blendMode: (sh as ShaderEntry).blendMode ?? "replace",
                         blendOpacity: (sh as ShaderEntry).blendOpacity ?? 1,
                     }));
+                }
+                if (version <= 4) {
+                    (s as ShaderState).deletedIds = [];
                 }
                 return s;
             },

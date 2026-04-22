@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
     fetchPublishedShaders,
+    fetchRemoteShaders,
     fetchProfile,
     upsertProfile,
     ensureSignedIn,
@@ -45,6 +46,7 @@ function GalleryPage() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [remoteOwnedIds, setRemoteOwnedIds] = useState<Set<string>>(new Set());
 
     // Username state
     const [username, setUsername] = useState<string | null>(null);
@@ -64,6 +66,9 @@ function GalleryPage() {
             fetchProfile(session.user.id).then((u) => {
                 setUsername(u);
                 setUsernameValue(u ?? "");
+            });
+            fetchRemoteShaders().then((shaders) => {
+                setRemoteOwnedIds(new Set(shaders.map((s) => s.id)));
             });
         });
     }, []);
@@ -190,7 +195,7 @@ function GalleryPage() {
                         )}
 
                         {!loading && communityShaders.length > 0 && (
-                            <div className="w-full max-w-3xl grid grid-cols-3 gap-3">
+                            <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                                 {communityShaders.map((s) => (
                                     <div
                                         key={s.id}
@@ -243,7 +248,7 @@ function GalleryPage() {
                 {/* ── My Shaders tab ── */}
                 {tab === "mine" && (
                     <>
-                        <div className="w-full max-w-3xl flex items-start justify-between">
+                        <div className="w-full flex items-start justify-between">
                             <div>
                                 <h1 className="text-2xl font-bold text-white tracking-tight mb-1">My Shaders</h1>
                                 <p className="text-surface-4 text-sm">Publish to share with the community.</p>
@@ -307,7 +312,7 @@ function GalleryPage() {
                         )}
 
                         {localShaders.length > 0 && (
-                            <div className="w-full max-w-3xl grid grid-cols-3 gap-3">
+                            <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                                 {localShaders.map((s) => (
                                     <div
                                         key={s.id}
@@ -315,13 +320,15 @@ function GalleryPage() {
                                     >
                                         <ShaderThumb passes={localChains.get(s.id)!} />
 
-                                        <button
-                                            onClick={() => setDeleteConfirmId(s.id)}
-                                            title="Delete"
-                                            className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center bg-surface-0/80 hover:bg-red-900 text-surface-4 hover:text-red-400 border border-border hover:border-red-800 transition-all opacity-0 group-hover:opacity-100 text-[10px]"
-                                        >
-                                            ×
-                                        </button>
+                                        {remoteOwnedIds.has(s.id) && (
+                                            <button
+                                                onClick={() => setDeleteConfirmId(s.id)}
+                                                title="Delete"
+                                                className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center bg-surface-0/80 hover:bg-red-900 text-surface-4 hover:text-red-400 border border-border hover:border-red-800 transition-all opacity-0 group-hover:opacity-100 text-[10px]"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
 
                                         <div className="p-3 flex flex-col gap-2">
                                             <p className="text-white text-xs font-medium">{s.name}</p>
