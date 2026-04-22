@@ -5,6 +5,7 @@ import { ColorPicker } from "./ColorPicker";
 interface Props {
     uniforms: ShaderUniform[];
     fragmentSource: string;
+    scopeNote?: string | null;
     onAdd: (u: ShaderUniform) => void;
     onUpdate: (name: string, patch: Partial<ShaderUniform>) => void;
     onRemove: (name: string) => void;
@@ -214,7 +215,7 @@ function UniformRow({
     );
 }
 
-export function UniformsPanel({ uniforms, fragmentSource, onAdd, onUpdate, onRemove, onValueChange }: Props) {
+export function UniformsPanel({ uniforms, fragmentSource, scopeNote, onAdd, onUpdate, onRemove, onValueChange }: Props) {
     const [name, setName] = useState("");
     const [type, setType] = useState<UniformType>("float");
     const [addError, setAddError] = useState("");
