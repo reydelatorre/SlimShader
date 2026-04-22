@@ -15,6 +15,21 @@ interface ShaderRow {
     updated_at: string;
 }
 
+interface ProfileRow {
+    id: string;
+    username: string | null;
+}
+
+// ShaderEntry augmented with the author's username — used only in gallery fetches
+export interface GalleryEntry extends ShaderEntry {
+    username: string | null;
+}
+
+// GalleryEntry plus resolved pass dependency shaders for the detail page
+export interface ShaderDetail extends GalleryEntry {
+    passDeps: ShaderEntry[];
+}
+
 function toRow(entry: ShaderEntry, userId: string): Omit<ShaderRow, "created_at" | "updated_at"> {
     return {
         id: entry.id,
@@ -77,14 +92,79 @@ export async function deleteRemoteShader(id: string): Promise<void> {
     if (error) console.error("[sync] delete failed", error.message);
 }
 
-export async function fetchPublishedShaders(): Promise<ShaderEntry[]> {
-    const { data, error } = await supabase
+export async function fetchShaderById(id: string): Promise<ShaderDetail | null> {
+    const { data: shaderData, error } = await supabase
+        .from("shaders")
+        .select("*")
+        .eq("id", id)
+        .eq("published", true)
+        .single();
+    if (error || !shaderData) return null;
+
+    const row = shaderData as ShaderRow;
+
+    const passIds = (row.passes ?? [])
+        .map((p: ShaderPass) => (typeof p === "string" ? p : p.id))
+        .filter(Boolean);
+
+    let passDeps: ShaderEntry[] = [];
+    if (passIds.length > 0) {
+        const { data } = await supabase.from("shaders").select("*").in("id", passIds);
+        passDeps = ((data as ShaderRow[]) ?? []).map(rowToEntry);
+    }
+
+    const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .eq("id", row.user_id)
+        .single();
+
+    const username = (profileData as ProfileRow | null)?.username ?? null;
+
+    return { ...rowToEntry(row), username, passDeps };
+}
+
+export async function fetchPublishedShaders(): Promise<GalleryEntry[]> {
+    const { data: shaderData, error } = await supabase
         .from("shaders")
         .select("*")
         .eq("published", true)
         .order("updated_at", { ascending: false });
     if (error) throw error;
-    return (data as ShaderRow[]).map(rowToEntry);
+
+    const rows = shaderData as ShaderRow[];
+    const userIds = [...new Set(rows.map((r) => r.user_id))];
+
+    const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .in("id", userIds);
+
+    const usernameMap = new Map<string, string | null>(
+        (profileData as ProfileRow[] ?? []).map((p) => [p.id, p.username])
+    );
+
+    return rows.map((row) => ({
+        ...rowToEntry(row),
+        username: usernameMap.get(row.user_id) ?? null,
+    }));
+}
+
+export async function fetchProfile(userId: string): Promise<string | null> {
+    const { data } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", userId)
+        .single();
+    return (data as ProfileRow | null)?.username ?? null;
+}
+
+export async function upsertProfile(userId: string, username: string): Promise<string | null> {
+    const { error } = await supabase
+        .from("profiles")
+        .upsert({ id: userId, username }, { onConflict: "id" });
+    if (error) return error.message;
+    return null;
 }
 
 // Fire-and-forget: sync a single entry using the current session

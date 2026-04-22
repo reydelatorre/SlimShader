@@ -1,20 +1,28 @@
 import { createRootRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { fetchRemoteShaders, upsertShader } from "../lib/supabase-sync";
 import { useShaderStore } from "../lib/shader-store";
 
-const PUBLIC_PATHS = ["/login", "/reset-password"];
+const PUBLIC_PATHS = ["/login", "/reset-password", "/shader"];
+
+function isPublic(path: string) {
+    return PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+}
 
 function RootLayout() {
     const navigate = useNavigate();
     const pathname = useRouterState({ select: (s) => s.location.pathname });
+    const pathnameRef = useRef(pathname);
     const seedFromRemote = useShaderStore((s) => s.seedFromRemote);
+
+    // Keep ref current so the auth callback always sees the live path
+    useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
     useEffect(() => {
         // Redirect based on initial session state
         supabase.auth.getSession().then(({ data: { session } }) => {
-            if (!session && !PUBLIC_PATHS.includes(pathname)) {
+            if (!session && !isPublic(pathnameRef.current)) {
                 navigate({ to: "/login" });
             }
             if (session) runSync();
@@ -32,7 +40,7 @@ function RootLayout() {
             }
             if (event === "SIGNED_IN" && session) {
                 runSync();
-                if (PUBLIC_PATHS.includes(pathname)) navigate({ to: "/" });
+                if (isPublic(pathnameRef.current)) navigate({ to: "/" });
             }
         });
 

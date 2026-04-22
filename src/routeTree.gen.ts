@@ -13,6 +13,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShaderShaderIdRouteImport } from './routes/shader.$shaderId'
 import { Route as EditorShaderIdRouteImport } from './routes/editor.$shaderId'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShaderShaderIdRoute = ShaderShaderIdRouteImport.update({
+  id: '/shader/$shaderId',
+  path: '/shader/$shaderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EditorShaderIdRoute = EditorShaderIdRouteImport.update({
   id: '/editor/$shaderId',
   path: '/editor/$shaderId',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/editor/$shaderId': typeof EditorShaderIdRoute
+  '/shader/$shaderId': typeof ShaderShaderIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/editor/$shaderId': typeof EditorShaderIdRoute
+  '/shader/$shaderId': typeof ShaderShaderIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,6 +70,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/editor/$shaderId': typeof EditorShaderIdRoute
+  '/shader/$shaderId': typeof ShaderShaderIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,8 +80,15 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/editor/$shaderId'
+    | '/shader/$shaderId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/gallery' | '/login' | '/reset-password' | '/editor/$shaderId'
+  to:
+    | '/'
+    | '/gallery'
+    | '/login'
+    | '/reset-password'
+    | '/editor/$shaderId'
+    | '/shader/$shaderId'
   id:
     | '__root__'
     | '/'
@@ -80,6 +96,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/editor/$shaderId'
+    | '/shader/$shaderId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -88,6 +105,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   EditorShaderIdRoute: typeof EditorShaderIdRoute
+  ShaderShaderIdRoute: typeof ShaderShaderIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -120,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shader/$shaderId': {
+      id: '/shader/$shaderId'
+      path: '/shader/$shaderId'
+      fullPath: '/shader/$shaderId'
+      preLoaderRoute: typeof ShaderShaderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/editor/$shaderId': {
       id: '/editor/$shaderId'
       path: '/editor/$shaderId'
@@ -136,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   EditorShaderIdRoute: EditorShaderIdRoute,
+  ShaderShaderIdRoute: ShaderShaderIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

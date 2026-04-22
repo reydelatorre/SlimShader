@@ -1,9 +1,16 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { fetchPublishedShaders, ensureSignedIn, upsertShader } from "../lib/supabase-sync";
+import {
+    fetchPublishedShaders,
+    fetchProfile,
+    upsertProfile,
+    ensureSignedIn,
+    upsertShader,
+} from "../lib/supabase-sync";
+import type { GalleryEntry } from "../lib/supabase-sync";
 import { useShaderStore } from "../lib/shader-store";
-import type { ShaderEntry } from "../lib/shader-store";
 import type { PassInfo } from "../lib/webgl-renderer";
+import type { ShaderEntry } from "../lib/shader-store";
 import { supabase } from "../lib/supabase";
 import { Logo } from "../components/Logo";
 import { ShaderThumb } from "../components/ShaderThumb";
@@ -34,19 +41,54 @@ function GalleryPage() {
     const localShaders = useShaderStore((s) => s.shaders);
 
     const [tab, setTab] = useState<Tab>("community");
-    const [communityShaders, setCommunityShaders] = useState<ShaderEntry[]>([]);
+    const [communityShaders, setCommunityShaders] = useState<GalleryEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+    // Username state
+    const [username, setUsername] = useState<string | null>(null);
+    const [editingUsername, setEditingUsername] = useState(false);
+    const [usernameValue, setUsernameValue] = useState("");
+    const [usernameError, setUsernameError] = useState<string | null>(null);
+    const [usernameSaving, setUsernameSaving] = useState(false);
 
     useEffect(() => {
         fetchPublishedShaders()
             .then(setCommunityShaders)
             .catch((e) => setFetchError(e.message))
             .finally(() => setLoading(false));
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session) return;
+            fetchProfile(session.user.id).then((u) => {
+                setUsername(u);
+                setUsernameValue(u ?? "");
+            });
+        });
     }, []);
 
-    // Lookup map for pass chain resolution (local takes precedence for up-to-date uniforms)
+    async function handleUsernameSave() {
+        const trimmed = usernameValue.trim();
+        if (!trimmed) { setUsernameError("Username required."); return; }
+        if (!/^[a-zA-Z0-9_]{2,24}$/.test(trimmed)) {
+            setUsernameError("2–24 chars, letters/numbers/underscores only.");
+            return;
+        }
+        setUsernameSaving(true);
+        setUsernameError(null);
+        const session = (await supabase.auth.getSession()).data.session;
+        if (!session) return;
+        const err = await upsertProfile(session.user.id, trimmed);
+        if (err) {
+            setUsernameError(err.includes("unique") ? "Username already taken." : err);
+        } else {
+            setUsername(trimmed);
+            setEditingUsername(false);
+        }
+        setUsernameSaving(false);
+    }
+
     const communityLookup = useMemo(() => {
         const map = new Map<string, ShaderEntry>();
         for (const s of communityShaders) map.set(s.id, s);
@@ -62,7 +104,6 @@ function GalleryPage() {
 
     const ownIds = useMemo(() => new Set(localShaders.map((s) => s.id)), [localShaders]);
 
-    // Pre-compute pass chains so ShaderThumb gets a stable reference per shader
     const communityChains = useMemo(() =>
         new Map(communityShaders.map((s) => [s.id, resolvePassChain(s, communityLookup)])),
         [communityShaders, communityLookup]
@@ -120,9 +161,7 @@ function GalleryPage() {
                         key={t}
                         onClick={() => setTab(t)}
                         className={`px-6 py-3 text-xs uppercase tracking-widest transition-colors border-r border-border ${
-                            tab === t
-                                ? "text-accent-bright bg-surface-1"
-                                : "text-surface-4 hover:text-white"
+                            tab === t ? "text-accent-bright bg-surface-1" : "text-surface-4 hover:text-white"
                         }`}
                     >
                         {t === "community" ? "Community" : "My Shaders"}
@@ -157,7 +196,9 @@ function GalleryPage() {
                                         key={s.id}
                                         className="group relative bg-surface-1 border border-border overflow-hidden flex flex-col"
                                     >
-                                        <ShaderThumb passes={communityChains.get(s.id)!} />
+                                        <Link to="/shader/$shaderId" params={{ shaderId: s.id }} className="block">
+                                            <ShaderThumb passes={communityChains.get(s.id)!} />
+                                        </Link>
 
                                         {ownIds.has(s.id) && (
                                             <button
@@ -169,9 +210,18 @@ function GalleryPage() {
                                             </button>
                                         )}
 
-                                        <div className="p-3 flex flex-col gap-2">
-                                            <p className="text-white text-xs font-medium">{s.name}</p>
-                                            <div className="flex items-center justify-between">
+                                        <div className="p-3 flex flex-col gap-1.5">
+                                            <Link
+                                                to="/shader/$shaderId"
+                                                params={{ shaderId: s.id }}
+                                                className="text-white text-xs font-medium hover:text-accent-bright transition-colors"
+                                            >
+                                                {s.name}
+                                            </Link>
+                                            {s.username && (
+                                                <p className="text-surface-4 text-[10px]">@{s.username}</p>
+                                            )}
+                                            <div className="flex items-center justify-between mt-0.5">
                                                 <span className="text-surface-4 text-[10px]">
                                                     {new Date(s.updatedAt).toLocaleDateString()}
                                                 </span>
@@ -193,9 +243,58 @@ function GalleryPage() {
                 {/* ── My Shaders tab ── */}
                 {tab === "mine" && (
                     <>
-                        <div className="text-center">
-                            <h1 className="text-2xl font-bold text-white tracking-tight mb-1">My Shaders</h1>
-                            <p className="text-surface-4 text-sm">Your shaders. Publish to share with the community.</p>
+                        <div className="w-full max-w-3xl flex items-start justify-between">
+                            <div>
+                                <h1 className="text-2xl font-bold text-white tracking-tight mb-1">My Shaders</h1>
+                                <p className="text-surface-4 text-sm">Publish to share with the community.</p>
+                            </div>
+
+                            {/* Username editor */}
+                            <div className="flex flex-col items-end gap-1 pt-1">
+                                {editingUsername ? (
+                                    <div className="flex flex-col items-end gap-1">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-surface-4 text-xs">@</span>
+                                            <input
+                                                autoFocus
+                                                value={usernameValue}
+                                                onChange={(e) => { setUsernameValue(e.target.value); setUsernameError(null); }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") handleUsernameSave();
+                                                    if (e.key === "Escape") { setEditingUsername(false); setUsernameValue(username ?? ""); setUsernameError(null); }
+                                                }}
+                                                placeholder="username"
+                                                className="bg-surface-2 border border-accent-bright text-white text-xs px-2 py-1 focus:outline-none w-36"
+                                            />
+                                            <button
+                                                onClick={handleUsernameSave}
+                                                disabled={usernameSaving}
+                                                className="text-[10px] px-2 py-1 bg-accent hover:bg-accent-bright text-white transition-colors disabled:opacity-50"
+                                            >
+                                                {usernameSaving ? "…" : "save"}
+                                            </button>
+                                            <button
+                                                onClick={() => { setEditingUsername(false); setUsernameValue(username ?? ""); setUsernameError(null); }}
+                                                className="text-[10px] px-2 py-1 text-surface-4 border border-border hover:text-white transition-colors"
+                                            >
+                                                cancel
+                                            </button>
+                                        </div>
+                                        {usernameError && <p className="text-red-400 text-[10px]">{usernameError}</p>}
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setEditingUsername(true)}
+                                        className="group flex items-center gap-1 text-surface-4 hover:text-white text-xs transition-colors"
+                                    >
+                                        {username ? (
+                                            <><span className="text-accent-bright">@{username}</span><span className="text-surface-4 group-hover:text-white text-[10px] ml-1">edit</span></>
+                                        ) : (
+                                            <span className="border-b border-dashed border-surface-4 hover:border-white text-[10px]">+ set username</span>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {localShaders.length === 0 && (
