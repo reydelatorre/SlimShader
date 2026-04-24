@@ -234,6 +234,111 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 `;
 
+export const EFFECT_BLOOM = `// Bloom
+// Bright-pass Gaussian blur added back to the image for a glow effect.
+// Uniforms: uThreshold (0–1), uStrength (0–3), uRadius (pixels spread)
+
+uniform float uThreshold;
+uniform float uStrength;
+uniform float uRadius;
+
+float lumaBloom(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 px = 1.0 / iResolution.xy;
+    vec2 uv = fragCoord / iResolution.xy;
+    vec4 original = texture(iChannel0, uv);
+
+    vec3 bloom = vec3(0.0);
+    float totalW = 0.0;
+    int R = 4;
+
+    for (int x = -R; x <= R; x++) {
+        for (int y = -R; y <= R; y++) {
+            float gw = exp(-float(x*x + y*y) / (float(R) * float(R)));
+            vec2 suv = clamp(uv + vec2(float(x), float(y)) * uRadius * px, vec2(0.0), vec2(1.0));
+            vec3 s = texture(iChannel0, suv).rgb;
+            bloom  += max(vec3(0.0), s - vec3(uThreshold)) * gw;
+            totalW += gw;
+        }
+    }
+    bloom /= totalW;
+
+    fragColor = vec4(clamp(original.rgb + bloom * uStrength, 0.0, 1.0), 1.0);
+}
+`;
+
+export const EFFECT_HALFTONE = `// Halftone
+// Monochrome halftone dot screen driven by source luminance.
+// Uniforms: uFreq (dots/100px), uAngle (degrees), uSoftness (edge blend), uDotColor, uBgColor
+
+uniform float uFreq;
+uniform float uAngle;
+uniform float uSoftness;
+uniform vec3  uDotColor;
+uniform vec3  uBgColor;
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv   = fragCoord / iResolution.xy;
+    vec4 src  = texture(iChannel0, uv);
+    float lum = dot(src.rgb, vec3(0.2126, 0.7152, 0.0722));
+
+    float ang = uAngle * 3.14159265 / 180.0;
+    mat2  rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
+
+    float cellPx = max(iResolution.y / (uFreq * 10.0), 1.0);
+    vec2  cell   = fract((rot * fragCoord) / cellPx) - 0.5;
+
+    float radius = sqrt(clamp(1.0 - lum, 0.0, 1.0)) * 0.7071;
+    float soft   = uSoftness / cellPx;
+    float dot_   = 1.0 - smoothstep(radius - soft, radius + soft, length(cell));
+
+    fragColor = vec4(mix(uBgColor, uDotColor, dot_), 1.0);
+}
+`;
+
+export const EFFECT_PIXEL_SORT = `// Pixel Sort
+// Sorts bright pixels by luminance along a direction — classic glitch aesthetic.
+// Uniforms: uSortLength (pixels), uThreshold (0–1), uAngle (degrees)
+
+uniform float uSortLength;
+uniform float uThreshold;
+uniform float uAngle;
+
+float lumaPS(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 px  = 1.0 / iResolution.xy;
+    vec2 uv  = fragCoord / iResolution.xy;
+    vec4 src = texture(iChannel0, uv);
+    float myL = lumaPS(src.rgb);
+
+    if (myL < uThreshold) { fragColor = src; return; }
+
+    float ang = uAngle * 3.14159265 / 180.0;
+    vec2  dir = vec2(cos(ang), sin(ang)) * px;
+
+    int N = 32;
+    int rank = 0, total = 0;
+
+    for (int i = 0; i < N; i++) {
+        float t = (float(i) - float(N) * 0.5) * uSortLength / float(N);
+        vec2 suv = uv + dir * t;
+        if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
+        float sl = lumaPS(texture(iChannel0, suv).rgb);
+        if (sl >= uThreshold) {
+            total++;
+            if (sl < myL) rank++;
+        }
+    }
+
+    if (total == 0) { fragColor = src; return; }
+
+    float targetT = (float(rank) / float(max(total - 1, 1)) - 0.5) * uSortLength;
+    fragColor = texture(iChannel0, clamp(uv + dir * targetT, vec2(0.0), vec2(1.0)));
+}
+`;
+
 // Registry for the effect library picker
 export interface EffectTemplate {
     id: string;
@@ -298,6 +403,41 @@ export const EFFECT_TEMPLATES: EffectTemplate[] = [
         defaultUniforms: [
             { name: "uLevels",   type: "float", value: 4,   min: 2, max: 16, step: 1,    label: "Color Levels" },
             { name: "uStrength", type: "float", value: 1.0, min: 0, max: 1,  step: 0.01, label: "Strength" },
+        ],
+    },
+    {
+        id: "bloom",
+        name: "Bloom",
+        description: "Bright-pass glow blur added back to image",
+        source: EFFECT_BLOOM,
+        defaultUniforms: [
+            { name: "uThreshold", type: "float", value: 0.6,  min: 0,   max: 1,   step: 0.01, label: "Threshold" },
+            { name: "uStrength",  type: "float", value: 1.5,  min: 0,   max: 3,   step: 0.05, label: "Strength" },
+            { name: "uRadius",    type: "float", value: 3.0,  min: 0.5, max: 10,  step: 0.5,  label: "Radius" },
+        ],
+    },
+    {
+        id: "halftone",
+        name: "Halftone",
+        description: "Monochrome dot screen driven by source luminance",
+        source: EFFECT_HALFTONE,
+        defaultUniforms: [
+            { name: "uFreq",      type: "float", value: 8,    min: 1,  max: 40,  step: 0.5,  label: "Frequency" },
+            { name: "uAngle",     type: "float", value: 45,   min: 0,  max: 90,  step: 1,    label: "Angle" },
+            { name: "uSoftness",  type: "float", value: 0.5,  min: 0,  max: 2,   step: 0.05, label: "Softness" },
+            { name: "uDotColor",  type: "vec3",  value: [0, 0, 0], isColor: true, label: "Dot Color" },
+            { name: "uBgColor",   type: "vec3",  value: [1, 1, 1], isColor: true, label: "Background" },
+        ],
+    },
+    {
+        id: "pixel-sort",
+        name: "Pixel Sort",
+        description: "Sorts bright pixels by luminance — glitch aesthetic",
+        source: EFFECT_PIXEL_SORT,
+        defaultUniforms: [
+            { name: "uSortLength", type: "float", value: 80,  min: 10, max: 300, step: 5,    label: "Sort Length" },
+            { name: "uThreshold",  type: "float", value: 0.3, min: 0,  max: 1,   step: 0.01, label: "Threshold" },
+            { name: "uAngle",      type: "float", value: 90,  min: 0,  max: 360, step: 1,    label: "Angle" },
         ],
     },
 ];

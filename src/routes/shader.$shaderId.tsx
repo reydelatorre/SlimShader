@@ -88,7 +88,7 @@ function ShaderDetailPage() {
                     <div className="text-center flex flex-col gap-3">
                         <p className="text-white text-sm">Shader not found.</p>
                         <p className="text-surface-4 text-xs">
-                            This shader may not exist or isn't published.
+                            This shader doesn't exist or you don't have access to it.
                         </p>
                         <Link
                             to="/gallery"
@@ -121,6 +121,9 @@ function ShaderDetailPage() {
                                 <div className="flex items-center gap-3">
                                     {shader.username && (
                                         <span className="text-accent-bright text-xs">@{shader.username}</span>
+                                    )}
+                                    {!shader.published && (
+                                        <span className="text-[10px] px-1.5 py-0.5 border border-yellow-700 text-yellow-500">unpublished</span>
                                     )}
                                     <span className="text-surface-4 text-[10px]">
                                         {new Date(shader.updatedAt).toLocaleDateString()}

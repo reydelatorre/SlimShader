@@ -318,7 +318,9 @@ function GalleryPage() {
                                         key={s.id}
                                         className="group relative bg-surface-1 border border-border overflow-hidden flex flex-col"
                                     >
-                                        <ShaderThumb passes={localChains.get(s.id)!} />
+                                        <Link to="/shader/$shaderId" params={{ shaderId: s.id }} className="block">
+                                            <ShaderThumb passes={localChains.get(s.id)!} />
+                                        </Link>
 
                                         {remoteOwnedIds.has(s.id) && (
                                             <button
@@ -331,7 +333,7 @@ function GalleryPage() {
                                         )}
 
                                         <div className="p-3 flex flex-col gap-2">
-                                            <p className="text-white text-xs font-medium">{s.name}</p>
+                                            <Link to="/shader/$shaderId" params={{ shaderId: s.id }} className="text-white hover:text-accent-bright text-xs font-medium transition-colors">{s.name}</Link>
                                             <div className="flex items-center justify-between">
                                                 <button
                                                     onClick={() => setPublished(s.id, !s.published)}

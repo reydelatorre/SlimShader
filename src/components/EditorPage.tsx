@@ -13,11 +13,13 @@ import { PassesPanel } from "./PassesPanel";
 import { ExportPanel } from "./ExportPanel";
 import { MeshPanel } from "./MeshPanel";
 import { EffectLibrary, buildUniformsFromTemplate } from "./EffectLibrary";
+import { PostPanel } from "./PostPanel";
 import type { EffectTemplate } from "../lib/default-shader";
+import type { PostSettings } from "../lib/shader-store";
 
 const MESH_ENABLED = import.meta.env.VITE_ENABLE_MESH === "true";
 
-type RightPanel = "uniforms" | "passes" | "mesh" | "export";
+type RightPanel = "uniforms" | "passes" | "post" | "mesh" | "export";
 
 export function EditorPage() {
     const { shaderId } = useParams({ from: "/editor/$shaderId" });
@@ -88,7 +90,7 @@ export function EditorPage() {
     function handleInsertEffect(template: EffectTemplate) {
         handleSourceChange(template.source);
         const newUniforms = buildUniformsFromTemplate(template);
-        const existing = new Set(shader.uniforms.map((u) => u.name));
+        const existing = new Set(shader?.uniforms.map((u) => u.name) ?? []);
         for (const u of newUniforms) {
             if (!existing.has(u.name)) addUniform(shaderId, u);
         }
@@ -223,6 +225,7 @@ export function EditorPage() {
                         meshRotY={meshRotY}
                         meshRotZ={meshRotZ}
                         wireframe={wireframe}
+                        postSettings={shader.postProcessing ?? null}
                     />
                     {error && (
                         <div className="flex-shrink-0 bg-surface-2 border-t border-red-900 max-h-28 overflow-y-auto">
@@ -237,7 +240,7 @@ export function EditorPage() {
                 <div className="w-80 flex-shrink-0 flex flex-col">
                     {/* Panel tabs */}
                     <div className="flex border-b border-border flex-shrink-0">
-                        {(["uniforms", "passes", ...(MESH_ENABLED ? ["mesh"] : []), "export"] as RightPanel[]).map((p) => (
+                        {(["uniforms", "passes", "post", ...(MESH_ENABLED ? ["mesh"] : []), "export"] as RightPanel[]).map((p) => (
                             <button
                                 key={p}
                                 onClick={() => setRightPanel(p)}
@@ -247,7 +250,7 @@ export function EditorPage() {
                                         : "text-surface-4 hover:text-white"
                                 }`}
                             >
-                                {p === "mesh" && meshData ? "mesh ●" : p}
+                                {p === "mesh" && meshData ? "mesh ●" : p === "post" && shader.postProcessing ? "post ●" : p}
                             </button>
                         ))}
                     </div>
@@ -302,6 +305,12 @@ export function EditorPage() {
                                 onMoveDown={(i) => reorderPass(shaderId, i, i + 1)}
                                 onUpdatePass={(i, patch) => updatePass(shaderId, i, patch)}
                                 onUpdateCurrentBlend={(blendMode, blendOpacity) => updateShader(shaderId, { blendMode, blendOpacity })}
+                            />
+                        )}
+                        {rightPanel === "post" && (
+                            <PostPanel
+                                settings={shader.postProcessing ?? null}
+                                onChange={(s: PostSettings | null) => updateShader(shaderId, { postProcessing: s ?? undefined })}
                             />
                         )}
                         {rightPanel === "mesh" && (

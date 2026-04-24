@@ -3,7 +3,7 @@ import {
     FRAGMENT_WRAPPER_PREFIX,
     MESH_FRAGMENT_PREFIX,
 } from "./default-shader";
-import type { ShaderUniform } from "./shader-store";
+import type { ShaderUniform, GradientStop, PostSettings } from "./shader-store";
 import type { MeshData } from "./obj-loader";
 
 export interface RendererError {
@@ -23,6 +23,7 @@ export interface PassInfo {
 
 export interface WebGLRenderer {
     updatePasses: (passes: PassInfo[]) => RendererError | null;
+    setPostProcessing: (settings: PostSettings | null) => void;
     setMesh: (data: MeshData) => void;
     clearMesh: () => void;
     setMeshTransform: (scale: number, rotX: number, rotY: number, rotZ: number) => void;
@@ -31,6 +32,60 @@ export interface WebGLRenderer {
     destroy: () => void;
     getError: () => RendererError | null;
 }
+
+// Post-processing fragment shader
+const POST_FRAGMENT_SRC = `#version 300 es
+precision highp float;
+uniform sampler2D uScreen;
+uniform vec2      iResolution;
+uniform float     uBrightness;
+uniform float     uContrast;
+uniform float     uSaturation;
+uniform float     uHue;
+uniform float     uExposure;
+out vec4 _slimOut;
+
+vec3 rgb2hsl(vec3 c) {
+    float M = max(c.r, max(c.g, c.b));
+    float m = min(c.r, min(c.g, c.b));
+    float d = M - m;
+    float h = 0.0, s = 0.0, l = (M + m) * 0.5;
+    if (d > 0.0) {
+        s = d / (1.0 - abs(2.0 * l - 1.0));
+        if (M == c.r)      h = mod((c.g - c.b) / d, 6.0);
+        else if (M == c.g) h = (c.b - c.r) / d + 2.0;
+        else               h = (c.r - c.g) / d + 4.0;
+        h /= 6.0;
+    }
+    return vec3(h, s, l);
+}
+
+vec3 hsl2rgb(vec3 c) {
+    float h = c.x, s = c.y, l = c.z;
+    float a = s * min(l, 1.0 - l);
+    return l + a * vec3(
+        clamp(abs(mod(h * 6.0 + 0.0, 6.0) - 3.0) - 1.0, -1.0, 1.0),
+        clamp(abs(mod(h * 6.0 + 4.0, 6.0) - 3.0) - 1.0, -1.0, 1.0),
+        clamp(abs(mod(h * 6.0 + 2.0, 6.0) - 3.0) - 1.0, -1.0, 1.0)
+    );
+}
+
+void main() {
+    vec2 uv  = gl_FragCoord.xy / iResolution;
+    vec4 col = texture(uScreen, uv);
+
+    col.rgb *= pow(2.0, uExposure);
+    col.rgb += uBrightness - 1.0;
+    col.rgb  = (col.rgb - 0.5) * uContrast + 0.5;
+
+    vec3 hsl = rgb2hsl(col.rgb);
+    hsl.y   *= uSaturation;
+    hsl.x    = mod(hsl.x + uHue / 360.0, 1.0);
+    col.rgb  = hsl2rgb(hsl);
+
+    _slimOut = vec4(clamp(col.rgb, 0.0, 1.0), col.a);
+}
+`;
 
 function compileShader(
     gl: WebGL2RenderingContext,
@@ -81,7 +136,11 @@ function buildFragmentSource(pass: PassInfo, hasMesh: boolean): string {
     const extraUniforms = pass.uniforms
         .filter((u) => u.type !== "sampler2D")
         .filter((u) => !new RegExp(`\\buniform\\b[^;]*\\b${u.name}\\b`).test(pass.source))
-        .map((u) => `uniform ${u.type === "select" ? "int" : u.type} ${u.name};`)
+        .map((u) => {
+            if (u.type === "select") return `uniform int ${u.name};`;
+            if (u.type === "ramp")   return `uniform sampler2D ${u.name};`;
+            return `uniform ${u.type} ${u.name};`;
+        })
         .join("\n");
     return (
         FRAGMENT_WRAPPER_PREFIX +
@@ -119,6 +178,23 @@ function buildProgram(
     return { prog, error: null };
 }
 
+function buildPostProgram(
+    gl: WebGL2RenderingContext
+): WebGLProgram | null {
+    const vertResult = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER_SRC);
+    if ("error" in vertResult) return null;
+    const fragResult = compileShader(gl, gl.FRAGMENT_SHADER, POST_FRAGMENT_SRC);
+    if ("error" in fragResult) { gl.deleteShader(vertResult.shader); return null; }
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, vertResult.shader);
+    gl.attachShader(prog, fragResult.shader);
+    gl.linkProgram(prog);
+    gl.deleteShader(vertResult.shader);
+    gl.deleteShader(fragResult.shader);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { gl.deleteProgram(prog); return null; }
+    return prog;
+}
+
 function sendUniform(gl: WebGL2RenderingContext, prog: WebGLProgram, u: ShaderUniform) {
     const loc = gl.getUniformLocation(prog, u.name);
     if (!loc) return;
@@ -131,7 +207,42 @@ function sendUniform(gl: WebGL2RenderingContext, prog: WebGLProgram, u: ShaderUn
         case "vec2":  gl.uniform2fv(loc, v as number[]); break;
         case "vec3":  gl.uniform3fv(loc, v as number[]); break;
         case "vec4":  gl.uniform4fv(loc, v as number[]); break;
+        // "ramp" texture binding is handled in draw()
     }
+}
+
+function buildRampPixels(stops: GradientStop[]): Uint8Array {
+    const N = 256;
+    const data = new Uint8Array(N * 4);
+    const sorted = [...stops].sort((a, b) => a.position - b.position);
+
+    for (let i = 0; i < N; i++) {
+        const t = i / (N - 1);
+        let r = 0, g = 0, b = 0;
+
+        if (sorted.length === 0) {
+            // keep black
+        } else if (sorted.length === 1) {
+            [r, g, b] = sorted[0].color;
+        } else {
+            const lo = sorted.findLast((s) => s.position <= t) ?? sorted[0];
+            const hi = sorted.find((s) => s.position >= t) ?? sorted[sorted.length - 1];
+            if (lo === hi) {
+                [r, g, b] = lo.color;
+            } else {
+                const f = (t - lo.position) / (hi.position - lo.position);
+                r = lo.color[0] + (hi.color[0] - lo.color[0]) * f;
+                g = lo.color[1] + (hi.color[1] - lo.color[1]) * f;
+                b = lo.color[2] + (hi.color[2] - lo.color[2]) * f;
+            }
+        }
+
+        data[i * 4 + 0] = Math.round(r * 255);
+        data[i * 4 + 1] = Math.round(g * 255);
+        data[i * 4 + 2] = Math.round(b * 255);
+        data[i * 4 + 3] = 255;
+    }
+    return data;
 }
 
 interface FBO { tex: WebGLTexture; fb: WebGLFramebuffer }
@@ -159,11 +270,17 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
     let programs: WebGLProgram[] = [];
     let currentPasses: PassInfo[] = [];
     let fbos: FBO[] = [];
+    let screenFBO: FBO | null = null;
     let fboSize = { w: 0, h: 0 };
     let animFrame = 0;
     let startTime = performance.now();
     let mouseX = 0, mouseY = 0, clickX = 0, clickY = 0;
     let currentError: RendererError | null = null;
+    let postSettings: PostSettings | null = null;
+    const postProgram = buildPostProgram(gl);
+
+    // Ramp texture cache: key = uniform name, value = { sig, tex }
+    const rampCache = new Map<string, { sig: string; tex: WebGLTexture }>();
 
     // Mesh state
     let meshTex: WebGLTexture | null = null;
@@ -209,6 +326,33 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
         fboSize = { w, h };
     }
 
+    function ensureScreenFBO(w: number, h: number) {
+        if (screenFBO && fboSize.w === w && fboSize.h === h) return;
+        if (screenFBO) { gl!.deleteTexture(screenFBO.tex); gl!.deleteFramebuffer(screenFBO.fb); }
+        screenFBO = createFBO(gl!, w, h);
+    }
+
+    function getRampTex(u: ShaderUniform): WebGLTexture | null {
+        const stops = u.stops ?? [];
+        const sig = JSON.stringify(stops);
+        const cached = rampCache.get(u.name);
+        if (cached && cached.sig === sig) return cached.tex;
+
+        if (cached) gl!.deleteTexture(cached.tex);
+
+        const tex = gl!.createTexture()!;
+        gl!.bindTexture(gl!.TEXTURE_2D, tex);
+        gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, 256, 1, 0, gl!.RGBA, gl!.UNSIGNED_BYTE, buildRampPixels(stops));
+        gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_MIN_FILTER, gl!.LINEAR);
+        gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_MAG_FILTER, gl!.LINEAR);
+        gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_WRAP_S, gl!.CLAMP_TO_EDGE);
+        gl!.texParameteri(gl!.TEXTURE_2D, gl!.TEXTURE_WRAP_T, gl!.CLAMP_TO_EDGE);
+        gl!.bindTexture(gl!.TEXTURE_2D, null);
+
+        rampCache.set(u.name, { sig, tex });
+        return tex;
+    }
+
     function drawQuad(prog: WebGLProgram) {
         gl!.bindBuffer(gl!.ARRAY_BUFFER, quad);
         const pos = gl!.getAttribLocation(prog, "a_position");
@@ -222,16 +366,23 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
 
         const w = canvas.width, h = canvas.height;
         const t = (performance.now() - startTime) / 1000;
+        const usePost = postSettings !== null && postProgram !== null;
 
-        if (programs.length > 1) ensureFBOs(programs.length - 1, w, h);
+        if (usePost) {
+            ensureFBOs(programs.length, w, h);
+            ensureScreenFBO(w, h);
+        } else {
+            ensureFBOs(programs.length - 1, w, h);
+        }
 
         let prevTex: WebGLTexture = blackTex;
 
         for (let i = 0; i < programs.length; i++) {
             const prog = programs[i];
             const isLast = i === programs.length - 1;
+            const targetFB = (!usePost && isLast) ? null : fbos[i].fb;
 
-            gl!.bindFramebuffer(gl!.FRAMEBUFFER, isLast ? null : fbos[i].fb);
+            gl!.bindFramebuffer(gl!.FRAMEBUFFER, targetFB);
             gl!.viewport(0, 0, w, h);
             gl!.useProgram(prog);
 
@@ -274,11 +425,48 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
             const uWireframe = gl!.getUniformLocation(prog, "uWireframe");
             if (uWireframe) gl!.uniform1i(uWireframe, wireframeMode);
 
-            for (const u of currentPasses[i].uniforms) sendUniform(gl!, prog, u);
+            // User uniforms — scalars first, then ramp textures at TEXTURE2+
+            let rampSlot = 2;
+            for (const u of currentPasses[i].uniforms) {
+                if (u.type === "ramp") {
+                    const loc = gl!.getUniformLocation(prog, u.name);
+                    const tex = getRampTex(u);
+                    if (loc && tex) {
+                        gl!.activeTexture(gl!.TEXTURE0 + rampSlot);
+                        gl!.bindTexture(gl!.TEXTURE_2D, tex);
+                        gl!.uniform1i(loc, rampSlot);
+                    }
+                    rampSlot++;
+                } else {
+                    sendUniform(gl!, prog, u);
+                }
+            }
 
             drawQuad(prog);
+            prevTex = fbos[i]?.tex ?? blackTex;
+        }
 
-            if (!isLast) prevTex = fbos[i].tex;
+        // Post-processing pass
+        if (usePost && postProgram && postSettings) {
+            gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
+            gl!.viewport(0, 0, w, h);
+            gl!.useProgram(postProgram);
+
+            const screenLoc = gl!.getUniformLocation(postProgram, "uScreen");
+            gl!.activeTexture(gl!.TEXTURE0);
+            gl!.bindTexture(gl!.TEXTURE_2D, prevTex);
+            if (screenLoc) gl!.uniform1i(screenLoc, 0);
+
+            const resLoc = gl!.getUniformLocation(postProgram, "iResolution");
+            if (resLoc) gl!.uniform2f(resLoc, w, h);
+
+            gl!.uniform1f(gl!.getUniformLocation(postProgram, "uBrightness")!,  postSettings.brightness);
+            gl!.uniform1f(gl!.getUniformLocation(postProgram, "uContrast")!,    postSettings.contrast);
+            gl!.uniform1f(gl!.getUniformLocation(postProgram, "uSaturation")!,  postSettings.saturation);
+            gl!.uniform1f(gl!.getUniformLocation(postProgram, "uHue")!,         postSettings.hue);
+            gl!.uniform1f(gl!.getUniformLocation(postProgram, "uExposure")!,    postSettings.exposure);
+
+            drawQuad(postProgram);
         }
 
         animFrame = requestAnimationFrame(draw);
@@ -307,6 +495,10 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
         updatePasses(passes) {
             currentPasses = passes;
             return recompile(meshNumTris > 0);
+        },
+
+        setPostProcessing(settings) {
+            postSettings = settings;
         },
 
         setMesh(data) {
@@ -358,9 +550,12 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
             cancelAnimationFrame(animFrame);
             for (const p of programs) gl!.deleteProgram(p);
             for (const { tex, fb } of fbos) { gl!.deleteTexture(tex); gl!.deleteFramebuffer(fb); }
+            if (screenFBO) { gl!.deleteTexture(screenFBO.tex); gl!.deleteFramebuffer(screenFBO.fb); }
+            if (postProgram) gl!.deleteProgram(postProgram);
             gl!.deleteTexture(blackTex);
             gl!.deleteTexture(blackMeshTex);
             if (meshTex) gl!.deleteTexture(meshTex);
+            for (const { tex } of rampCache.values()) gl!.deleteTexture(tex);
         },
 
         getError() { return currentError; },

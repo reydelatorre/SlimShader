@@ -3,6 +3,7 @@ import type { ShaderUniform, UniformType } from "../lib/shader-store";
 import { ColorPicker } from "./ColorPicker";
 import { ScrubInput } from "./ScrubInput";
 import { XYPad } from "./XYPad";
+import { GradientRampEditor } from "./GradientRampEditor";
 
 interface Props {
     uniforms: ShaderUniform[];
@@ -14,7 +15,7 @@ interface Props {
     onValueChange: (name: string, value: number | number[] | boolean) => void;
 }
 
-const SCALAR_TYPES: UniformType[] = ["float", "int", "bool", "vec2", "vec3", "vec4", "select"];
+const SCALAR_TYPES: UniformType[] = ["float", "int", "bool", "vec2", "vec3", "vec4", "select", "ramp"];
 
 function defaultValue(type: UniformType): number | number[] | boolean {
     switch (type) {
@@ -220,6 +221,20 @@ function UniformRow({
                         </div>
                     )}
                 </div>
+            );
+        }
+
+        // Gradient Ramp
+        if (uniform.type === "ramp") {
+            const stops = uniform.stops ?? [
+                { position: 0, color: [0, 0, 0] as [number, number, number] },
+                { position: 1, color: [1, 1, 1] as [number, number, number] },
+            ];
+            return (
+                <GradientRampEditor
+                    stops={stops}
+                    onChange={(next) => onUpdate(uniform.name, { stops: next })}
+                />
             );
         }
 
@@ -465,6 +480,7 @@ export function UniformsPanel({ uniforms, fragmentSource, scopeNote, onAdd, onUp
             ...(description.trim() ? { description: description.trim() } : {}),
             ...(group.trim() ? { group: group.trim() } : {}),
             ...(type === "select" ? { options: [{ label: "Off", value: 0 }, { label: "On", value: 1 }] } : {}),
+            ...(type === "ramp" ? { stops: [{ position: 0, color: [0, 0, 0] as [number, number, number] }, { position: 1, color: [1, 1, 1] as [number, number, number] }] } : {}),
         };
 
         onAdd(base);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createWebGLRenderer, type WebGLRenderer, type RendererError, type PassInfo } from "../lib/webgl-renderer";
 import type { MeshData } from "../lib/obj-loader";
+import type { PostSettings } from "../lib/shader-store";
 
 interface Props {
     passes: PassInfo[];
@@ -12,9 +13,10 @@ interface Props {
     meshRotY?: number;
     meshRotZ?: number;
     wireframe?: number;
+    postSettings?: PostSettings | null;
 }
 
-export function ShaderPreview({ passes, onError, captureRef, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0 }: Props) {
+export function ShaderPreview({ passes, onError, captureRef, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0, postSettings }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rendererRef = useRef<WebGLRenderer | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,10 @@ export function ShaderPreview({ passes, onError, captureRef, meshData, meshScale
     useEffect(() => {
         rendererRef.current?.setWireframe(wireframe);
     }, [wireframe]);
+
+    useEffect(() => {
+        rendererRef.current?.setPostProcessing(postSettings ?? null);
+    }, [postSettings]);
 
     useEffect(() => {
         const container = containerRef.current;

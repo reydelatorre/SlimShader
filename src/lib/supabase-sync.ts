@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { ShaderEntry, ShaderUniform, ShaderPass } from "./shader-store";
+import { cached, invalidate, prime } from "./query-cache";
 
 interface ShaderRow {
     id: string;
@@ -73,12 +74,14 @@ export async function ensureSignedIn(): Promise<string> {
 }
 
 export async function fetchRemoteShaders(): Promise<ShaderEntry[]> {
-    const { data, error } = await supabase
-        .from("shaders")
-        .select("*")
-        .order("updated_at", { ascending: false });
-    if (error) throw error;
-    return (data as ShaderRow[]).map(rowToEntry);
+    return cached("remote-owned", async () => {
+        const { data, error } = await supabase
+            .from("shaders")
+            .select("*")
+            .order("updated_at", { ascending: false });
+        if (error) throw error;
+        return (data as ShaderRow[]).map(rowToEntry);
+    }, 30_000);
 }
 
 export async function upsertShader(entry: ShaderEntry, userId: string): Promise<void> {
@@ -86,6 +89,7 @@ export async function upsertShader(entry: ShaderEntry, userId: string): Promise<
         .from("shaders")
         .upsert(toRow(entry, userId), { onConflict: "id" });
     if (error) console.error("[sync] upsert failed", error.message);
+    else invalidate("remote-owned", "published", `shader:${entry.id}`);
 }
 
 export async function deleteRemoteShader(id: string): Promise<void> {
@@ -94,74 +98,82 @@ export async function deleteRemoteShader(id: string): Promise<void> {
         .delete({ count: "exact" })
         .eq("id", id);
     if (error) console.error("[sync] delete failed", error.message);
-    else if (count === 0) console.warn("[sync] delete matched 0 rows — RLS may be blocking it", id);
+    else {
+        if (count === 0) console.warn("[sync] delete matched 0 rows — RLS may be blocking it", id);
+        invalidate("remote-owned", "published", `shader:${id}`);
+    }
 }
 
 export async function fetchShaderById(id: string): Promise<ShaderDetail | null> {
-    const { data: shaderData, error } = await supabase
-        .from("shaders")
-        .select("*")
-        .eq("id", id)
-        .eq("published", true)
-        .single();
-    if (error || !shaderData) return null;
+    return cached(`shader:${id}`, async () => {
+        const { data: shaderData, error } = await supabase
+            .from("shaders")
+            .select("*")
+            .eq("id", id)
+            .single();
+        if (error || !shaderData) return null;
 
-    const row = shaderData as ShaderRow;
+        const row = shaderData as ShaderRow;
 
-    const passIds = (row.passes ?? [])
-        .map((p: ShaderPass) => (typeof p === "string" ? p : p.id))
-        .filter(Boolean);
+        const passIds = (row.passes ?? [])
+            .map((p: ShaderPass) => (typeof p === "string" ? p : p.id))
+            .filter(Boolean);
 
-    let passDeps: ShaderEntry[] = [];
-    if (passIds.length > 0) {
-        const { data } = await supabase.from("shaders").select("*").in("id", passIds);
-        passDeps = ((data as ShaderRow[]) ?? []).map(rowToEntry);
-    }
+        let passDeps: ShaderEntry[] = [];
+        if (passIds.length > 0) {
+            const { data } = await supabase.from("shaders").select("*").in("id", passIds);
+            passDeps = ((data as ShaderRow[]) ?? []).map(rowToEntry);
+        }
 
-    const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .eq("id", row.user_id)
-        .single();
+        const { data: profileData } = await supabase
+            .from("profiles")
+            .select("id, username")
+            .eq("id", row.user_id)
+            .single();
 
-    const username = (profileData as ProfileRow | null)?.username ?? null;
+        const username = (profileData as ProfileRow | null)?.username ?? null;
 
-    return { ...rowToEntry(row), username, passDeps, userId: row.user_id };
+        return { ...rowToEntry(row), username, passDeps, userId: row.user_id };
+    });
 }
 
 export async function fetchPublishedShaders(): Promise<GalleryEntry[]> {
-    const { data: shaderData, error } = await supabase
-        .from("shaders")
-        .select("*")
-        .eq("published", true)
-        .order("updated_at", { ascending: false });
-    if (error) throw error;
+    return cached("published", async () => {
+        const { data: shaderData, error } = await supabase
+            .from("shaders")
+            .select("*")
+            .eq("published", true)
+            .order("updated_at", { ascending: false });
+        if (error) throw error;
 
-    const rows = shaderData as ShaderRow[];
-    const userIds = [...new Set(rows.map((r) => r.user_id))];
+        const rows = shaderData as ShaderRow[];
+        const userIds = [...new Set(rows.map((r) => r.user_id))];
 
-    const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .in("id", userIds);
+        const { data: profileData } = await supabase
+            .from("profiles")
+            .select("id, username")
+            .in("id", userIds);
 
-    const usernameMap = new Map<string, string | null>(
-        (profileData as ProfileRow[] ?? []).map((p) => [p.id, p.username])
-    );
+        const usernameMap = new Map<string, string | null>(
+            (profileData as ProfileRow[] ?? []).map((p) => [p.id, p.username])
+        );
 
-    return rows.map((row) => ({
-        ...rowToEntry(row),
-        username: usernameMap.get(row.user_id) ?? null,
-    }));
+        return rows.map((row) => ({
+            ...rowToEntry(row),
+            username: usernameMap.get(row.user_id) ?? null,
+        }));
+    });
 }
 
 export async function fetchProfile(userId: string): Promise<string | null> {
-    const { data } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", userId)
-        .single();
-    return (data as ProfileRow | null)?.username ?? null;
+    return cached(`profile:${userId}`, async () => {
+        const { data } = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", userId)
+            .single();
+        return (data as ProfileRow | null)?.username ?? null;
+    });
 }
 
 export async function upsertProfile(userId: string, username: string): Promise<string | null> {
@@ -169,6 +181,8 @@ export async function upsertProfile(userId: string, username: string): Promise<s
         .from("profiles")
         .upsert({ id: userId, username }, { onConflict: "id" });
     if (error) return error.message;
+    invalidate(`profile:${userId}`, "published");
+    prime(`profile:${userId}`, username);
     return null;
 }
 

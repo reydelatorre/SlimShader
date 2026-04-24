@@ -3,12 +3,25 @@ import { persist } from "zustand/middleware";
 import { DEFAULT_FRAGMENT_SHADER } from "./default-shader";
 import { syncEntry, deleteRemoteShader } from "./supabase-sync";
 
-export type UniformType = "float" | "vec2" | "vec3" | "vec4" | "bool" | "int" | "sampler2D" | "select";
+export type UniformType = "float" | "vec2" | "vec3" | "vec4" | "bool" | "int" | "sampler2D" | "select" | "ramp";
 export type BlendMode =
     | "replace" | "mix"
     | "add" | "subtract" | "difference"
     | "multiply" | "screen" | "overlay" | "soft-light" | "hard-light"
     | "darken" | "lighten" | "color-dodge" | "color-burn";
+
+export interface GradientStop {
+    position: number;
+    color: [number, number, number];
+}
+
+export interface PostSettings {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    hue: number;
+    exposure: number;
+}
 
 export interface ShaderPass {
     id: string;
@@ -30,6 +43,7 @@ export interface ShaderUniform {
     group?: string;
     options?: { label: string; value: number }[];
     visibleWhen?: { key: string; equals: number | boolean };
+    stops?: GradientStop[];
 }
 
 export interface ShaderEntry {
@@ -41,6 +55,7 @@ export interface ShaderEntry {
     blendMode: BlendMode;
     blendOpacity: number;
     published: boolean;
+    postProcessing?: PostSettings;
     createdAt: number;
     updatedAt: number;
 }
@@ -259,7 +274,7 @@ export const useShaderStore = create<ShaderState>()(
         }),
         {
             name: "slimshader-store",
-            version: 5,
+            version: 6,
             migrate(state: unknown, version: number) {
                 const s = state as { shaders: ShaderEntry[] };
                 if (version === 0) {
@@ -287,6 +302,9 @@ export const useShaderStore = create<ShaderState>()(
                 }
                 if (version <= 4) {
                     (s as ShaderState).deletedIds = [];
+                }
+                if (version <= 5) {
+                    // postProcessing is optional — no migration needed, undefined = inactive
                 }
                 return s;
             },
