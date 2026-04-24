@@ -347,7 +347,7 @@ export interface EffectTemplate {
     source: string;
     defaultUniforms: Array<{
         name: string; type: "float" | "vec2" | "vec3"; value: number | number[];
-        min?: number; max?: number; step?: number; isColor?: boolean; label?: string;
+        min?: number; max?: number; step?: number; isColor?: boolean; label?: string; description?: string;
     }>;
 }
 
