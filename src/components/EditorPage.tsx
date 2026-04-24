@@ -42,6 +42,7 @@ export function EditorPage() {
     const [editingName, setEditingName] = useState(false);
     const [nameValue, setNameValue] = useState(shader?.name ?? "");
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const passSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const captureRef = useRef<(() => string | null) | null>(null);
     const [uniformScopeId, setUniformScopeId] = useState(shaderId);
     const [showEffectLibrary, setShowEffectLibrary] = useState(false);
@@ -81,6 +82,16 @@ export function EditorPage() {
             }, 500);
         },
         [shaderId, updateShader]
+    );
+
+    const handlePassSourceChange = useCallback(
+        (passId: string, value: string) => {
+            if (passSaveTimeoutRef.current) clearTimeout(passSaveTimeoutRef.current);
+            passSaveTimeoutRef.current = setTimeout(() => {
+                updateShader(passId, { fragmentSource: value });
+            }, 500);
+        },
+        [updateShader]
     );
 
     const handleError = useCallback((err: RendererError | null) => {
@@ -209,9 +220,37 @@ export function EditorPage() {
             {/* Main layout: editor | preview | right panel */}
             <div className="flex-1 flex min-h-0">
                 {/* GLSL Editor */}
-                <div className="flex-1 min-w-0 border-r border-border">
-                    <ShaderEditor value={localSource} onChange={handleSourceChange} />
-                </div>
+                {(() => {
+                    const isCurrentScope = uniformScopeId === shaderId;
+                    const scopeShader = isCurrentScope
+                        ? null
+                        : allShaders.find((s) => s.id === uniformScopeId);
+                    const editorValue = isCurrentScope
+                        ? localSource
+                        : (scopeShader?.fragmentSource ?? "");
+                    const editorOnChange = isCurrentScope
+                        ? handleSourceChange
+                        : (v: string) => handlePassSourceChange(uniformScopeId, v);
+                    return (
+                        <div className="flex-1 min-w-0 border-r border-border flex flex-col">
+                            {!isCurrentScope && scopeShader && (
+                                <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 bg-surface-2 border-b border-border">
+                                    <span className="text-[10px] text-yellow-400">editing pass →</span>
+                                    <span className="text-[10px] text-white font-medium">{scopeShader.name}</span>
+                                    <button
+                                        onClick={() => setUniformScopeId(shaderId)}
+                                        className="ml-auto text-[10px] text-surface-4 hover:text-white transition-colors"
+                                    >
+                                        back to {shader.name}
+                                    </button>
+                                </div>
+                            )}
+                            <div className="flex-1 min-h-0">
+                                <ShaderEditor value={editorValue} onChange={editorOnChange} />
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Preview */}
                 <div className="w-[40%] flex-shrink-0 border-r border-border flex flex-col">

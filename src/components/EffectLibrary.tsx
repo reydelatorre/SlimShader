@@ -74,5 +74,6 @@ export function buildUniformsFromTemplate(template: EffectTemplate): ShaderUnifo
         step: u.step,
         isColor: u.isColor,
         label: u.label,
+        description: u.description,
     }));
 }
