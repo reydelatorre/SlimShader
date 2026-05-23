@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node -e \"const g = require\\('gifenc'\\); console.log\\(Object.keys\\(g\\)\\)\")",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

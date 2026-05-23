@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { createWebGLRenderer, type WebGLRenderer, type RendererError, type PassInfo } from "../lib/webgl-renderer";
 import type { MeshData } from "../lib/obj-loader";
 import type { PostSettings } from "../lib/shader-store";
+import { renderShaderToGif, type GifOptions } from "../lib/gif-capture";
+
+type GifCaptureFn = (opts: GifOptions, onProgress?: (n: number, total: number) => void) => Promise<Blob>;
 
 interface Props {
     passes: PassInfo[];
     onError: (err: RendererError | null) => void;
     captureRef?: React.MutableRefObject<(() => string | null) | null>;
+    gifCaptureRef?: React.MutableRefObject<GifCaptureFn | null>;
     meshData?: MeshData | null;
     meshScale?: number;
     meshRotX?: number;
@@ -16,11 +20,17 @@ interface Props {
     postSettings?: PostSettings | null;
 }
 
-export function ShaderPreview({ passes, onError, captureRef, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0, postSettings }: Props) {
+export function ShaderPreview({ passes, onError, captureRef, gifCaptureRef, meshData, meshScale = 1, meshRotX = 0, meshRotY = 0, meshRotZ = 0, wireframe = 0, postSettings }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rendererRef = useRef<WebGLRenderer | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [supported, setSupported] = useState(true);
+
+    // Keep current passes/postSettings available to gifCaptureRef without re-creating it
+    const passesRef = useRef(passes);
+    useEffect(() => { passesRef.current = passes; }, [passes]);
+    const postSettingsRef = useRef(postSettings ?? null);
+    useEffect(() => { postSettingsRef.current = postSettings ?? null; }, [postSettings]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -29,10 +39,15 @@ export function ShaderPreview({ passes, onError, captureRef, meshData, meshScale
         if (!renderer) { setSupported(false); return; }
         rendererRef.current = renderer;
         if (captureRef) captureRef.current = () => canvas.toDataURL("image/png");
+        if (gifCaptureRef) {
+            gifCaptureRef.current = (opts, onProgress) =>
+                renderShaderToGif(passesRef.current, postSettingsRef.current, opts, onProgress);
+        }
         return () => {
             renderer.destroy();
             rendererRef.current = null;
             if (captureRef) captureRef.current = null;
+            if (gifCaptureRef) gifCaptureRef.current = null;
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -31,6 +31,9 @@ export interface WebGLRenderer {
     resize: (w: number, h: number) => void;
     destroy: () => void;
     getError: () => RendererError | null;
+    stopLoop: () => void;
+    renderAtTime: (time: number) => void;
+    readPixels: () => Uint8ClampedArray;
 }
 
 // Post-processing fragment shader
@@ -361,11 +364,11 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
         gl!.drawArrays(gl!.TRIANGLES, 0, 6);
     }
 
-    function draw() {
-        if (programs.length === 0) { animFrame = requestAnimationFrame(draw); return; }
+    function drawFrame(overrideTime?: number) {
+        if (programs.length === 0) return;
 
         const w = canvas.width, h = canvas.height;
-        const t = (performance.now() - startTime) / 1000;
+        const t = overrideTime !== undefined ? overrideTime : (performance.now() - startTime) / 1000;
         const usePost = postSettings !== null && postProgram !== null;
 
         if (usePost) {
@@ -468,7 +471,10 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
 
             drawQuad(postProgram);
         }
+    }
 
+    function draw() {
+        drawFrame();
         animFrame = requestAnimationFrame(draw);
     }
 
@@ -559,5 +565,27 @@ export function createWebGLRenderer(canvas: HTMLCanvasElement): WebGLRenderer | 
         },
 
         getError() { return currentError; },
+
+        stopLoop() {
+            cancelAnimationFrame(animFrame);
+        },
+
+        renderAtTime(time: number) {
+            drawFrame(time);
+            gl!.finish();
+        },
+
+        readPixels(): Uint8ClampedArray {
+            const w = canvas.width, h = canvas.height;
+            const raw = new Uint8Array(w * h * 4);
+            gl!.readPixels(0, 0, w, h, gl!.RGBA, gl!.UNSIGNED_BYTE, raw);
+            // WebGL origin is bottom-left; flip rows to top-left for image encoding
+            const out = new Uint8ClampedArray(w * h * 4);
+            const rowBytes = w * 4;
+            for (let y = 0; y < h; y++) {
+                out.set(raw.subarray((h - 1 - y) * rowBytes, (h - y) * rowBytes), y * rowBytes);
+            }
+            return out;
+        },
     };
 }

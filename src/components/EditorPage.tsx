@@ -44,6 +44,7 @@ export function EditorPage() {
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const passSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const captureRef = useRef<(() => string | null) | null>(null);
+    const gifCaptureRef = useRef<((opts: import("../lib/gif-capture").GifOptions, onProgress?: (n: number, total: number) => void) => Promise<Blob>) | null>(null);
     const [uniformScopeId, setUniformScopeId] = useState(shaderId);
     const [showEffectLibrary, setShowEffectLibrary] = useState(false);
 
@@ -258,6 +259,7 @@ export function EditorPage() {
                         passes={allPasses}
                         onError={handleError}
                         captureRef={captureRef}
+                        gifCaptureRef={gifCaptureRef}
                         meshData={meshData}
                         meshScale={meshScale}
                         meshRotX={meshRotX}
@@ -370,7 +372,7 @@ export function EditorPage() {
                                 onInsertStarter={() => handleSourceChange(MESH_RAYCAST_STARTER)}
                             />
                         )}
-                        {rightPanel === "export" && <ExportPanel shader={shader} captureRef={captureRef} />}
+                        {rightPanel === "export" && <ExportPanel shader={shader} captureRef={captureRef} gifCaptureRef={gifCaptureRef} />}
                     </div>
                 </div>
             </div>

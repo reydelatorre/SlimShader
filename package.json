@@ -15,6 +15,7 @@
     "@tanstack/react-router": "^1.168.23",
     "@tanstack/router-plugin": "^1.167.22",
     "file-saver": "^2.0.5",
+    "gifenc": "^1.0.3",
     "jszip": "^3.10.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
