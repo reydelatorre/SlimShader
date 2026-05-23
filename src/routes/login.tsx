@@ -36,8 +36,9 @@ function LoginPage() {
                 if (error) throw error;
                 setMessage("Check your email for a confirmation link.");
             } else if (mode === "forgot") {
+                const siteUrl = import.meta.env.VITE_SITE_URL || window.location.origin;
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/reset-password`,
+                    redirectTo: `${siteUrl}/reset-password`,
                 });
                 if (error) throw error;
                 setMessage("Password reset email sent — check your inbox.");
